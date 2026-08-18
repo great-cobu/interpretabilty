@@ -1,0 +1,108 @@
+name: mlops_by_policy
+
+services:
+  mariadb:
+    build:
+      context: .
+      dockerfile: docker/mariadb/Dockerfile
+    container_name: mlops_mariadb
+    restart: unless-stopped
+    env_file:
+      - ./docker/mariadb/.env
+    ports:
+      - "3306:3306"
+    volumes:
+      - "/Volumes/Macintosh HD/mlops_volumes/mariadb:/var/lib/mysql"
+    networks:
+      - mlops_network
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect"]
+      timeout: 5s
+      retries: 5
+
+  rustfs:
+    build:
+      context: .
+      dockerfile: docker/rustfs/Dockerfile
+    container_name: mlops_rustfs
+    restart: unless-stopped
+    env_file:
+      - ./docker/rustfs/.env
+    environment:
+      RUSTFS_LISTEN_ADDR: "0.0.0.0:8080"
+      RUSTFS_DATA_DIR: "/data"
+    ports:
+      - "8080:8080"
+    volumes:
+      - "/Volumes/Macintosh HD/mlops_volumes/rustfs:/data"
+    networks:
+      - mlops_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      timeout: 5s
+      retries: 5
+
+  mlflow:
+    build:
+      context: .
+      dockerfile: docker/mlflow/Dockerfile
+      args:
+        PYTHON_VERSION: "3.11"
+    container_name: mlops_mlflow
+    restart: unless-stopped
+    env_file:
+      - ./docker/mlflow/.env
+      - ./docker/mariadb/.env
+    command: >
+      mlflow server
+      --host 0.0.0.0
+      --port 5000
+      --backend-store-uri mysql+pymysql://$${MARIADB_USER}:$${MARIADB_PASSWORD}@mariadb:3306/$${MARIADB_DATABASE}
+      --default-artifact-root /artifacts
+    ports:
+      - "5000:5000"
+    volumes:
+      - "/Volumes/Macintosh HD/mlops_volumes/mlflow:/artifacts"
+    networks:
+      - mlops_network
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    environment:
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      timeout: 5s
+      retries: 5
+
+  ml:
+    build:
+      context: .
+      dockerfile: docker/ml/Dockerfile
+      args:
+        PYTHON_VERSION: "3.11"
+    container_name: mlops_ml
+    restart: unless-stopped
+    env_file:
+      - ./docker/ml/.env
+      - ./docker/mlflow/.env
+    working_dir: /workspace
+    volumes:
+      - ".:/workspace"
+      - "/Volumes/Macintosh HD/mlops_volumes/mlflow/.cache:/workspace/.cache"
+      - "/Volumes/Macintosh HD/mlops_volumes/ml/datasets:/workspace/datasets"
+      - "/Volumes/Macintosh HD/mlops_volumes/ml/models:/workspace/models"
+    networks:
+      - mlops_network
+    depends_on:
+      mlflow:
+        condition: service_healthy
+    environment:
+      MLFLOW_TRACKING_URI: "http://mlflow:5000"
+      PYTHONUNBUFFERED: "1"
+    stdin_open: true
+    tty: true
+
+networks:
+  mlops_network:
+    driver: bridge

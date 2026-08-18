@@ -1,0 +1,14 @@
+# Compiled Prolog artifacts
+a.out
+*.qlf
+
+# OS generated files
+.DS_Store
+.gen_env_check.out
+
+# Python caches
+__pycache__/
+*.pyc
+
+# Local generated environment files
+.env

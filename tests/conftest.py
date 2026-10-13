@@ -1,39 +1,49 @@
-"""Offline dataset fixtures: no downloads are performed by routine tests."""
+"""Pytest fixtures for synthetic and real-cached MNIST tests."""
 
-import pytest
 from PIL import Image
-from torch.utils.data import Dataset
+import pytest
+from torchvision import datasets
 
-from models.MNIST import data
+
+def pytest_addoption(parser):
+    parser.addoption("--run-integration", action="store_true", help="Run checks requiring a real local MNIST cache")
 
 
-class TinyMNIST(Dataset):
-    def __init__(self, root, train, transform, download):
+def pytest_collection_modifyitems(config, items):
+    if config.getoption("--run-integration"):
+        return
+    skip = pytest.mark.skip(reason="Needs a prepared local MNIST cache; pass --run-integration")
+    for item in items:
+        if "integration" in item.keywords:
+            item.add_marker(skip)
+
+
+class TinyMNIST:
+    """In-memory MNIST-shaped fixture dataset."""
+
+    def __init__(self, root, train=True, transform=None, download=False):
+        self.root = root
+        self.train = train
         self.transform = transform
-        self.size = 23 if train else 11
+        self.download = download
+        self.size = 18 if train else 7
 
     def __len__(self):
         return self.size
 
-    def __getitem__(self, index):
-        image = Image.new("L", (28, 28), color=index % 256)
-        return self.transform(image), index % 10
+    def __getitem__(self, index: int):
+        value = int((index * 17 + (0 if self.train else 5)) % 256)
+        image = Image.new("L", (28, 28), color=value)
+        if self.transform is not None:
+            image = self.transform(image)
+        return image, index % 10
 
 
 @pytest.fixture
-def tiny_mnist(monkeypatch):
-    monkeypatch.setattr(data.datasets, "MNIST", TinyMNIST)
-    monkeypatch.setattr(data.MNISTDataModule, "train_size", 18)
-    monkeypatch.setattr(data.MNISTDataModule, "val_size", 5)
+def patch_mnist(monkeypatch):
+    from models.MNIST import data
 
-
-def pytest_addoption(parser):
-    parser.addoption("--run-integration", action="store_true", help="Check the existing real MNIST cache")
-
-
-def pytest_collection_modifyitems(config, items):
-    if not config.getoption("--run-integration"):
-        skip = pytest.mark.skip(reason="Use --run-integration with an existing MNIST cache")
-        for item in items:
-            if "integration" in item.keywords:
-                item.add_marker(skip)
+    monkeypatch.setattr(datasets, "MNIST", TinyMNIST)
+    monkeypatch.setattr(data.MNISTDataModule, "train_size", 12)
+    monkeypatch.setattr(data.MNISTDataModule, "val_size", 6)
+    return TinyMNIST

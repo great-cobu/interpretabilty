@@ -33,7 +33,6 @@ google-auth==2.57.0
 graphene==3.4.3
 graphql-core==3.2.12
 graphql-relay==3.2.0
-greenlet==3.5.5
 gunicorn==26.2.0
 h11==0.16.0
 huey==3.3.4
@@ -75,7 +74,6 @@ packaging==26.3
 pandas==2.3.3
 parso==0.8.7
 pillow==12.3.0
-playwright==1.63.0
 pluggy==1.6.0
 prettytable==3.18.0
 propcache==0.5.2
@@ -87,7 +85,6 @@ pyasn1-modules==0.4.2
 pycparser==3.0
 pydantic==2.13.4
 pydantic-core==2.46.4
-pyee==13.0.1
 pygments==2.21.0
 pymdown-extensions==11.0.2
 pymysql==1.2.0

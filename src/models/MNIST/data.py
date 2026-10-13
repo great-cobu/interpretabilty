@@ -1,4 +1,4 @@
-"""MNIST caching, reproducible subsets, and Lightning data loaders."""
+"""MNIST caching, reproducible 55k/5k/10k splits, Lightning DataModule, and data helpers."""
 
 import json
 from pathlib import Path
@@ -10,11 +10,11 @@ import torch
 from torch.utils.data import DataLoader, Subset, random_split
 from torchvision import datasets, transforms
 
-from models.MNIST.config import DataConfig
+from models.MNIST.config import Config, DataConfig
 
 
 def seed_worker(worker_id: int) -> None:
-    """Seed Python/NumPy from the worker seed assigned by PyTorch."""
+    """Seed Python and NumPy from the worker seed assigned by PyTorch."""
     seed = torch.initial_seed() % 2**32
     random.seed(seed)
     np.random.seed(seed)
@@ -30,7 +30,7 @@ def resolve_accelerator(requested: str) -> str:
 
 
 class MNISTDataModule(pl.LightningDataModule):
-    """Keep acquisition separate from stage-specific, repeatable dataset setup."""
+    """MNIST DataModule with deterministic 55,000 / 5,000 / 10,000 splits."""
 
     train_size = 55_000
     val_size = 5_000
@@ -52,8 +52,10 @@ class MNISTDataModule(pl.LightningDataModule):
     def _dataset(self, train: bool, download: bool = False):
         try:
             return datasets.MNIST(
-                root=self.config.directory, train=train,
-                transform=self.transform, download=download,
+                root=self.config.directory,
+                train=train,
+                transform=self.transform,
+                download=download,
             )
         except (RuntimeError, OSError) as exc:
             if not download:
@@ -61,24 +63,14 @@ class MNISTDataModule(pl.LightningDataModule):
                     "MNIST cache is missing or unreadable; run mnist-cnn prepare-data "
                     "--download with the same --data-dir before using --no-download"
                 ) from exc
-            raise RuntimeError(
-                "MNIST download failed; check network access and data-directory permissions"
-            ) from exc
+            raise RuntimeError("MNIST download failed; check network access and data-directory permissions") from exc
 
     def prepare_data(self) -> None:
-        # Lightning may run this on a different process: do not assign split state.
         self._dataset(train=True, download=self.config.download)
         self._dataset(train=False, download=self.config.download)
 
-    def _load_indices(self, size: int) -> dict:
-        try:
-            indices = json.loads(Path(self.config.split_indices).read_text())
-        except (OSError, ValueError) as exc:
-            raise ValueError("Cannot read split indices JSON") from exc
-        return self._validate_indices(indices, size)
-
     def _validate_indices(self, indices: dict, size: int) -> dict:
-        if not isinstance(indices, dict) or indices.get("dataset") != "MNIST" or indices.get("version") != 1:
+        if not isinstance(indices, dict) or indices.get("dataset") != "MNIST":
             raise ValueError("Unsupported split indices format")
         if indices.get("seed") != self.config.split_seed:
             raise ValueError("Saved split seed does not match data.split_seed")
@@ -87,8 +79,7 @@ class MNISTDataModule(pl.LightningDataModule):
             raise ValueError("Split indices must contain train and validation lists")
         if len(train) != self.train_size or len(val) != self.val_size:
             raise ValueError("Saved split sizes do not match the MNIST split contract")
-        combined = train + val
-        if any(type(i) is not int for i in combined) or set(combined) != set(range(size)):
+        if set(train + val) != set(range(size)):
             raise ValueError("Split indices must uniquely partition the official training set")
         return indices
 
@@ -97,19 +88,24 @@ class MNISTDataModule(pl.LightningDataModule):
             raise ValueError(f"Unsupported data stage: {stage}")
         if stage in {None, "fit", "validate"} and self.train_dataset is None:
             full = self._dataset(train=True)
-            if len(full) != self.train_size + self.val_size:
-                raise ValueError("Unexpected MNIST training dataset size")
             if self.split_indices is not None:
                 indices = self._validate_indices(self.split_indices, len(full))
             elif self.config.split_indices:
-                indices = self._load_indices(len(full))
+                raw = json.loads(Path(self.config.split_indices).read_text())
+                indices = self._validate_indices(raw, len(full))
             else:
                 train, val = random_split(
-                    full, [self.train_size, self.val_size],
+                    full,
+                    [self.train_size, self.val_size],
                     generator=torch.Generator().manual_seed(self.config.split_seed),
                 )
-                indices = {"version": 1, "dataset": "MNIST", "seed": self.config.split_seed,
-                           "train": train.indices, "validation": val.indices}
+                indices = {
+                    "version": 1,
+                    "dataset": "MNIST",
+                    "seed": self.config.split_seed,
+                    "train": train.indices,
+                    "validation": val.indices,
+                }
             self.split_indices = indices
             self.train_dataset = Subset(full, indices["train"])
             self.val_dataset = Subset(full, indices["validation"])
@@ -125,8 +121,11 @@ class MNISTDataModule(pl.LightningDataModule):
         if dataset is None:
             raise RuntimeError("Call setup for the requested stage before requesting a loader")
         return DataLoader(
-            dataset, batch_size=self.config.batch_size, shuffle=shuffle,
-            num_workers=self.config.num_workers, drop_last=False,
+            dataset,
+            batch_size=self.config.batch_size,
+            shuffle=shuffle,
+            num_workers=self.config.num_workers,
+            drop_last=False,
             pin_memory=self.accelerator == "cuda",
             persistent_workers=self.config.num_workers > 0,
             worker_init_fn=seed_worker,
@@ -146,7 +145,6 @@ class MNISTDataModule(pl.LightningDataModule):
         return self._loader(self.test_dataset)
 
     def state_dict(self) -> dict:
-        """Lightning stores exact membership and loader randomness in checkpoints."""
         return {"split_indices": self.split_indices, "train_generator": self._train_generator.get_state()}
 
     def load_state_dict(self, state_dict: dict) -> None:
@@ -159,3 +157,48 @@ class MNISTDataModule(pl.LightningDataModule):
                 self.val_dataset = Subset(full, indices["validation"])
         if "train_generator" in state_dict:
             self._train_generator.set_state(state_dict["train_generator"].cpu())
+
+
+def prepare_data(config: Config) -> dict:
+    module = MNISTDataModule(config.data)
+    module.prepare_data()
+    return {
+        "dataset": "MNIST",
+        "data_directory": str(Path(config.data.directory).resolve()),
+        "download_enabled": config.data.download,
+    }
+
+
+def inspect_data(config: Config, output: Path) -> dict:
+    """Inspect split counts, batch shapes, and pixel/label ranges."""
+    accelerator = resolve_accelerator(config.trainer.accelerator)
+    module = MNISTDataModule(config.data, accelerator=accelerator)
+    module.prepare_data()
+    module.setup()
+    module.save_split_indices(output / "split_indices.json")
+    samples = {}
+    for name, loader in (
+        ("train", module.train_dataloader()),
+        ("validation", module.val_dataloader()),
+        ("test", module.test_dataloader()),
+    ):
+        images, labels = next(iter(loader))
+        samples[name] = {
+            "count": len(loader.dataset),
+            "batch_shape": list(images.shape),
+            "image_dtype": str(images.dtype),
+            "label_dtype": str(labels.dtype),
+            "batch_label_range": [int(labels.min()), int(labels.max())],
+            "batch_pixel_range": [float(images.min()), float(images.max())],
+            "drop_last": loader.drop_last,
+            "pin_memory": loader.pin_memory,
+        }
+    report = {
+        "dataset": "MNIST",
+        "accelerator": accelerator,
+        "data_directory": str(Path(config.data.directory).resolve()),
+        "split_seed": config.data.split_seed,
+        "splits": samples,
+    }
+    (output / "data_summary.json").write_text(json.dumps(report, indent=2) + "\n")
+    return report

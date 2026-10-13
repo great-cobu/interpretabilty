@@ -34,7 +34,6 @@ mlflow = ["mlflow>=3"]
 dev = ["pytest>=9"]
 notebooks = [
     "marimo>=0.19",
-    "playwright>=1.63.0",
 ]
 
 [project.scripts]

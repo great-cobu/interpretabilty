@@ -7,32 +7,30 @@ app = marimo.App(width="medium", css_file="theme.css")
 
 @app.cell
 def _():
-    import marimo as mo
     import json
     import os
-    from io import BytesIO
-    from pathlib import Path
     from dataclasses import replace
+    from pathlib import Path
+    import marimo as mo
     import matplotlib.pyplot as plt
     import torch
-    from mnist_cnn.config import DataConfig
-    from mnist_cnn.data import MNISTDataModule
-    from mnist_cnn.module import MNISTClassifier
-    from mnist_cnn.model import MNISTCNN
-    from mnist_cnn.demo import train_demo
-    from mnist_cnn.page_export import export_page, report_html
-    from mnist_cnn.validation import confusion_matrix
+    from models.MNIST.config import DataConfig
+    from models.MNIST.data import MNISTDataModule
+    from models.MNIST.evaluate import confusion_matrix
+    from models.MNIST.model import MNISTCNN, MNISTClassifier
+    from models.MNIST.train import train_demo
+
     def notebook_md(text, *, supporting=False):
         """Render prose with the shared theme; use Markdown heading levels."""
         _classes = "mnist-prose mnist-supporting" if supporting else "mnist-prose"
         return mo.Html(f'<div class="{_classes}">{mo.md(text).text}</div>')
 
     root = Path(__file__).resolve().parents[1]
-    return DataConfig, MNISTClassifier, MNISTDataModule, MNISTCNN, confusion_matrix, json, mo, os, plt, replace, root, torch, train_demo, notebook_md, BytesIO, export_page, report_html
+    return DataConfig, MNISTCNN, MNISTClassifier, MNISTDataModule, confusion_matrix, json, mo, notebook_md, os, plt, replace, root, torch, train_demo
 
 
 @app.cell(hide_code=True)
-def _(mo, notebook_md):
+def _(notebook_md):
     notebook_md("""
     # MNIST CNN interactive demo
     Explore cached validation examples and saved training results. Select a run
@@ -43,19 +41,22 @@ def _(mo, notebook_md):
 
 
 @app.cell
-def _(mo, os, notebook_md):
+def _(mo, notebook_md, os):
     training_form = mo.ui.dictionary({
         "epochs": mo.ui.number(1, 100, step=1, value=2, label="Training epochs"),
         "threads": mo.ui.number(1, os.cpu_count() or 1, step=1,
                                 value=min(8, os.cpu_count() or 1), label="Training CPU threads"),
     }).form(submit_button_label="Train new demo run")
-    mo.vstack([notebook_md("## Train a demo\nChoose the number of epochs, then press **Train new demo run**. "
-                    "Each epoch uses 20 training batches and five validation batches on CPU.", supporting=True), training_form])
+    mo.vstack([
+        notebook_md("## Train a demo\nChoose the number of epochs, then press **Train new demo run**. "
+                    "Each epoch uses 20 training batches and five validation batches on CPU.", supporting=True),
+        training_form,
+    ])
     return (training_form,)
 
 
 @app.cell
-def _(mo, root, train_demo, training_form, notebook_md):
+def _(mo, notebook_md, root, train_demo, training_form):
     trained_run = None
     training_error = None
     if training_form.value is not None:
@@ -65,7 +66,7 @@ def _(mo, root, train_demo, training_form, notebook_md):
         except (OSError, RuntimeError, ValueError) as exc:
             training_error = str(exc)
     notebook_md(f"Training failed: {training_error}" if training_error else
-          f"Saved run: `{trained_run}`" if trained_run else "")
+                f"Saved run: `{trained_run}`" if trained_run else "")
     return (trained_run,)
 
 
@@ -77,7 +78,8 @@ def _(mo, root, trained_run):
     )
     run_picker = mo.ui.dropdown(
         options={p.name: str(p) for p in runs},
-        value=trained_run.name if trained_run else runs[0].name if runs else None, label="Saved training run",
+        value=trained_run.name if trained_run else runs[0].name if runs else None,
+        label="Saved training run",
     )
     run_picker
     return (run_picker,)
@@ -101,7 +103,7 @@ def _(mo, os):
 
 
 @app.cell
-def _(mo, thread_picker, torch, notebook_md):
+def _(notebook_md, thread_picker, torch):
     torch.set_num_threads(thread_picker.value)
     inference_threads = torch.get_num_threads()
     notebook_md(f"Using **{inference_threads} CPU threads** for inference. Changing this control recomputes validation results.")
@@ -109,7 +111,7 @@ def _(mo, thread_picker, torch, notebook_md):
 
 
 @app.cell
-def _(DataConfig, MNISTDataModule, classifier, mo, replace, root, notebook_md):
+def _(DataConfig, MNISTDataModule, classifier, notebook_md, replace, root):
     _settings = classifier.config.data if classifier is not None else DataConfig(directory=str(root / "data"))
     data = MNISTDataModule(replace(_settings, download=False), accelerator="cpu")
     data_error = None
@@ -118,7 +120,7 @@ def _(DataConfig, MNISTDataModule, classifier, mo, replace, root, notebook_md):
     except (RuntimeError, ValueError, OSError) as exc:
         data_error = str(exc)
     notebook_md(f"**Cache unavailable:** {data_error}. Run demo step 1 first." if data_error else
-          "Cached MNIST: 55,000 training and 5,000 validation examples. The preview uses validation data.")
+                "Cached MNIST: 55,000 training and 5,000 validation examples. The preview uses validation data.")
     return data, data_error
 
 
@@ -149,16 +151,16 @@ def _(digit_indices, digit_picker, mo, notebook_md):
 
 
 @app.cell
-def _(matching_indices, mo, next_example, notebook_md):
+def _(matching_indices, next_example, notebook_md):
     example_number = next_example.value % len(matching_indices) if matching_indices else 0
     sample_index = matching_indices[example_number] if matching_indices else None
     notebook_md(f"Example **{example_number + 1} of {len(matching_indices)}** for this digit." if matching_indices else
-          "No validation examples are available for this digit.")
+                "No validation examples are available for this digit.")
     return (sample_index,)
 
 
 @app.cell
-def _(json, mo, run_picker):
+def _(json, run_picker):
     selected_run = None
     summary = None
     config = None
@@ -175,7 +177,7 @@ def _(json, mo, run_picker):
 
 
 @app.cell
-def _(MNISTClassifier, mo, selected_run, notebook_md):
+def _(MNISTClassifier, notebook_md, selected_run):
     classifier = None
     checkpoint_error = None
     if selected_run:
@@ -186,13 +188,12 @@ def _(MNISTClassifier, mo, selected_run, notebook_md):
         except (OSError, RuntimeError, ValueError, KeyError) as exc:
             checkpoint_error = str(exc)
     notebook_md(f"Checkpoint unavailable: {checkpoint_error}" if checkpoint_error else
-          "Predictions use this run's best checkpoint on CPU." if classifier else "Select a run to enable predictions.")
+                "Predictions use this run's best checkpoint on CPU." if classifier else "Select a run to enable predictions.")
     return (classifier,)
 
 
 @app.cell
-def _(BytesIO, classifier, data, data_error, inference_threads, mo, plt, sample_index, torch, notebook_md):
-    preview_png = None
+def _(classifier, data, data_error, mo, notebook_md, plt, sample_index, torch):
     preview = notebook_md("Prepare the local cache to see digit examples.")
     if data_error is None and sample_index is not None:
         _image, _label = data.val_dataset[sample_index]
@@ -212,23 +213,20 @@ def _(BytesIO, classifier, data, data_error, inference_threads, mo, plt, sample_
         else:
             _axes[1].axis("off")
         _fig.tight_layout()
-        _buffer = BytesIO()
-        _fig.savefig(_buffer, format="png", dpi=180, bbox_inches="tight")
-        preview_png = _buffer.getvalue()
         preview = mo.as_html(_fig)
         plt.close(_fig)
     preview
-    return (preview_png,)
+    return
 
 
 @app.cell
-def _(config, mo, run_error, selected_run, summary, notebook_md):
+def _(config, mo, notebook_md, run_error, selected_run, summary):
     mo.vstack([
         notebook_md("## Saved results"),
         notebook_md(f"Unable to read run: {run_error}" if run_error else
-              "Choose a training run above." if summary is None else
-              f"**{selected_run.name}** · {summary['completed_epochs']} completed epochs · "
-              f"{summary['global_step']} optimizer steps · smoke run: {summary['smoke_run']}"),
+                    "Choose a training run above." if summary is None else
+                    f"**{selected_run.name}** · {summary['completed_epochs']} completed epochs · "
+                    f"{summary['global_step']} optimizer steps · smoke run: {summary['smoke_run']}"),
         mo.ui.table([summary["metrics"]]) if summary else notebook_md("No saved training runs yet. Run demo step 3, then reopen the notebook."),
         mo.accordion({"Resolved configuration": notebook_md(f"```yaml\n{config}\n```")}) if config else notebook_md(""),
         mo.image((selected_run / "learning_curves.png").read_bytes())
@@ -258,8 +256,7 @@ def _(mo):
 
 
 @app.cell
-def _(BytesIO, heatmap_mode, mo, plt, validation_counts, notebook_md):
-    heatmap_png = None
+def _(heatmap_mode, mo, notebook_md, plt, validation_counts):
     matrix_display = notebook_md("Select a checkpoint and prepare the cache to see the validation heat map.")
     if validation_counts is not None:
         _counts = validation_counts.numpy()
@@ -278,82 +275,27 @@ def _(BytesIO, heatmap_mode, mo, plt, validation_counts, notebook_md):
                          ha="center", va="center", fontsize=8,
                          color="white" if _value > _heat.norm.vmax / 2 else "black")
         _fig.tight_layout()
-        _buffer = BytesIO()
-        _fig.savefig(_buffer, format="png", dpi=180, bbox_inches="tight")
-        heatmap_png = _buffer.getvalue()
         matrix_display = mo.vstack([
             notebook_md(f"## Validation heat map\nAll **{_total:,} validation examples**, including digits 0–9. "
-                  f"Accuracy: **{_accuracy:.2%}**. Rows are true digits; columns are predictions. "
-                  "This uses the entire validation set, regardless of demo batch limits."),
+                        f"Accuracy: **{_accuracy:.2%}**. Rows are true digits; columns are predictions. "
+                        "This uses the entire validation set, regardless of demo batch limits."),
             mo.as_html(_fig),
         ])
         plt.close(_fig)
     matrix_display
-    return (heatmap_png,)
+    return
 
 
 @app.cell
 def _(MNISTCNN, mo, notebook_md):
     model = MNISTCNN()
     architecture = str(model)
-    mo.vstack([notebook_md("## CNN architecture"), notebook_md(f"```text\n{architecture}\n```"),
-               notebook_md(f"Parameters: {sum(p.numel() for p in model.parameters()):,}. Input: [N, 1, 28, 28]; output: ten logits.")])
-    return (architecture,)
-
-
-@app.cell
-def _(architecture, config, digit_picker, heatmap_mode, heatmap_png, inference_threads,
-      preview_png, report_html, root, sample_index, selected_run, summary, validation_counts):
-    snapshot_html = report_html(
-        theme=(root / "notebooks/theme.css").read_text(),
-        run_name=selected_run.name if selected_run else "No run selected",
-        summary=summary, config=config, digit=digit_picker.value, sample_index=sample_index,
-        threads=inference_threads, heatmap_mode=heatmap_mode.value,
-        preview=preview_png, heatmap=heatmap_png,
-        learning_curve=(selected_run / "learning_curves.png").read_bytes()
-        if selected_run and (selected_run / "learning_curves.png").is_file() else None,
-        architecture=architecture,
-        validation_accuracy=float(validation_counts.diag().sum() / validation_counts.sum())
-        if validation_counts is not None and validation_counts.sum() > 0 else None,
-    )
-    return (snapshot_html,)
-
-
-@app.cell
-def _(mo, notebook_md, root, snapshot_html):
-    export_snapshot = snapshot_html
-    export_form = mo.ui.dictionary({
-        "format": mo.ui.radio(["PDF", "PNG"], value="PDF", inline=True, label="File format"),
-        "filename": mo.ui.text(value="mnist-demo", label="Filename (extension added automatically)"),
-        "destination": mo.ui.dropdown(options={
-            "Project exports": str(root / "runs/exports"),
-            "Desktop": str(root.home() / "Desktop"),
-            "Downloads": str(root.home() / "Downloads"),
-            "Custom folder": "custom",
-        }, value="Project exports", label="Save in"),
-        "custom_folder": mo.ui.text(value=str(root / "runs/exports"), label="Custom folder (absolute path)"),
-    }).form(submit_button_label="Export page")
-    mo.vstack([notebook_md("## Export page\nSave the current results as a PDF or full-page PNG. "
-                          "Choose a name and folder, then press **Export page**. Existing files are preserved with a numbered filename.", supporting=True), export_form])
-    return export_form, export_snapshot
-
-
-@app.cell
-def _(export_form, export_page, export_snapshot, mo, notebook_md, root):
-    exported_path = None
-    export_error = None
-    if export_form.value is not None:
-        _options = export_form.value
-        _folder = _options["custom_folder"] if _options["destination"] == "custom" else _options["destination"]
-        try:
-            with mo.status.spinner(title="Exporting page…"):
-                exported_path = export_page(export_snapshot, _folder, _options["filename"],
-                                            _options["format"].lower(), root / "runs/.browser-cache")
-        except (OSError, RuntimeError, ValueError, TimeoutError) as exc:
-            export_error = str(exc)
-    notebook_md(f"Export failed: {export_error}" if export_error else
-                f"Saved **{exported_path.name}** in `{exported_path.parent}`." if exported_path else "")
-    return (exported_path,)
+    mo.vstack([
+        notebook_md("## CNN architecture"),
+        notebook_md(f"```text\n{architecture}\n```"),
+        notebook_md(f"Parameters: {sum(p.numel() for p in model.parameters()):,}. Input: [N, 1, 28, 28]; output: ten logits."),
+    ])
+    return
 
 
 if __name__ == "__main__":

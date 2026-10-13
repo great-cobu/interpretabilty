@@ -4,11 +4,25 @@ a.out
 
 # OS generated files
 .DS_Store
+.AppleDouble
+.LSOverride
+._*
 .gen_env_check.out
 
-# Python caches
+# IDE files
+.idea/
+
+# Python caches & build artifacts
 __pycache__/
-*.pyc
+*.py[cod]
+.pytest_cache/
+*.egg-info/
+/dist/
+
+# Environments, datasets, and generated runs
+/.venv/
+/data/
+/runs/
 
 # Local generated environment files
 .env

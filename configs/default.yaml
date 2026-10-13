@@ -1,0 +1,32 @@
+# Paths are relative to the working directory; run commands from the project root.
+data:
+  directory: data
+  download: true
+  split_seed: 42
+  batch_size: 64
+  num_workers: 0
+  mean: 0.1307
+  std: 0.3081
+  split_indices: null
+model:
+  dropout: 0.2
+optimizer:
+  learning_rate: 0.001
+  weight_decay: 0.0
+trainer:
+  seed: 42
+  max_epochs: 10
+  accelerator: auto
+  devices: 1
+  precision: 32-true
+  deterministic: true
+  patience: 3
+  limit_train_batches: null
+  limit_val_batches: null
+tracking:
+  enabled: false
+  uri: null
+  experiment_name: mnist-cnn
+  run_name: null
+  tags: {}
+output_dir: null

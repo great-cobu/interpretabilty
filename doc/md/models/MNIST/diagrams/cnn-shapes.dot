@@ -1,0 +1,19 @@
+digraph CNN {
+  graph [rankdir=TB, bgcolor="white", pad="0.2", ranksep="0.3", fontname="Helvetica", fontsize=18, label="MNIST CNN: shapes for a batch of N images", labelloc=t];
+  node [shape=box, style="rounded,filled", fillcolor="#eef4fb", color="#456789", fontname="Helvetica", fontsize=12, margin="0.18,0.1"];
+  edge [color="#587085", fontname="Helvetica", fontsize=10];
+  input [label="Normalized images\nN x 1 x 28 x 28", fillcolor="#fff2d6"];
+  conv1 [label="3x3 Conv: 1 -> 32 channels + ReLU\nN x 32 x 28 x 28"];
+  pool1 [label="2x2 max pool\nN x 32 x 14 x 14"];
+  conv2 [label="3x3 Conv: 32 -> 64 channels + ReLU\nN x 64 x 14 x 14"];
+  pool2 [label="2x2 max pool\nN x 64 x 7 x 7"];
+  flatten [label="Flatten each image\nN x 3136"];
+  hidden [label="Linear: 3136 -> 128 + ReLU\nN x 128"];
+  dropout [label="Dropout p=0.2 (training mode only)\nN x 128"];
+  logits [label="Linear: 128 -> 10\nLogits: N x 10", fillcolor="#e7f5e9"];
+  loss [label="Cross-entropy + integer labels\nScalar loss -> backward()", fillcolor="#fff2d6"];
+  prediction [label="argmax -> digit\nsoftmax -> probabilities", fillcolor="#e7f5e9"];
+  input -> conv1 -> pool1 -> conv2 -> pool2 -> flatten -> hidden -> dropout -> logits;
+  logits -> loss [label="Gradient check"];
+  logits -> prediction [label="Interpretation"];
+}

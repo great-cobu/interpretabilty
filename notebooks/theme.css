@@ -1,0 +1,55 @@
+/* MNIST notebook theme.
+ * Change only the palette below to recolor all notebook prose.
+ * Heading hierarchy: # title, ## section, ### (and deeper) subheading.
+ * Supporting descriptions use notebook_md(..., supporting=True).
+ * Rules use our own class names rather than Marimo's internal selectors.
+ */
+:root {
+  --mnist-title: #16324F;
+  --mnist-heading: #245A81;
+  --mnist-subheading: #226B70;
+  --mnist-supporting: #526174;
+  --mnist-text: #243447;
+  --mnist-background: #FFFFFF;
+  --mnist-heading-background: #EAF2F8;
+}
+
+.mnist-prose {
+  color: var(--mnist-text);
+  background-color: var(--mnist-background);
+  color-scheme: light;
+  padding: 0.35rem 0.75rem;
+  border-radius: 0.35rem;
+  line-height: 1.6;
+}
+
+.mnist-prose :is(p, li) {
+  color: var(--mnist-text);
+}
+
+.mnist-prose :is(h1, h2, h3, h4, h5, h6) {
+  background-color: var(--mnist-heading-background);
+  padding: 0.65rem 0.9rem;
+  border-radius: 0.45rem;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.mnist-prose h1 {
+  color: var(--mnist-title);
+  font-size: 2rem;
+}
+
+.mnist-prose h2 {
+  color: var(--mnist-heading);
+  font-size: 1.5rem;
+}
+
+.mnist-prose :is(h3, h4, h5, h6) {
+  color: var(--mnist-subheading);
+  font-size: 1.15rem;
+}
+
+.mnist-prose.mnist-supporting :is(p, li) {
+  color: var(--mnist-supporting);
+}

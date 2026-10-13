@@ -1,0 +1,28 @@
+digraph MNIST {
+  graph [rankdir=LR, bgcolor="white", pad="0.25", nodesep="0.35", ranksep="0.65", fontname="Helvetica", label="Stage 3: MNIST data pipeline", labelloc=t, fontsize=20];
+  node [shape=box, style="rounded,filled", fillcolor="#eef4fb", color="#456789", fontname="Helvetica", fontsize=12, margin="0.16,0.12"];
+  edge [color="#587085", fontname="Helvetica", fontsize=10];
+  download [label="prepare-data\nDownload once / reuse cache"];
+  cache [label="data/MNIST/raw/\nIgnored by Git", fillcolor="#fff2d6"];
+  official_train [label="Official training set\n60,000 images"];
+  official_test [label="Official test set\n10,000 images"];
+  split [label="Seeded split\nSave exact indices"];
+  train [label="Training subset\n55,000 images"];
+  val [label="Validation subset\n5,000 images"];
+  train_loader [label="Normalize + batch\nShuffle training only"];
+  val_loader [label="Normalize + batch\nOrdered validation"];
+  test_loader [label="Normalize + batch\nOrdered test / prediction"];
+  inspect [label="inspect-data\nBatch shapes + split counts\nNo model training", fillcolor="#e7f5e9"];
+  download -> cache;
+  cache -> official_train;
+  cache -> official_test;
+  official_train -> split;
+  split -> train;
+  split -> val;
+  train -> train_loader;
+  val -> val_loader;
+  official_test -> test_loader;
+  train_loader -> inspect;
+  val_loader -> inspect;
+  test_loader -> inspect;
+}

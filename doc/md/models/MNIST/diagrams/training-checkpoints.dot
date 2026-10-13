@@ -1,0 +1,25 @@
+digraph Training {
+  graph [rankdir=TB, bgcolor="white", pad="0.25", nodesep="0.35", ranksep="0.45", fontname="Helvetica", label="Training, checkpoint selection, resume, and testing", labelloc=t, fontsize=18];
+  node [shape=box, style="rounded,filled", fillcolor="#eef4fb", color="#456789", fontname="Helvetica", fontsize=12, margin="0.16,0.1"];
+  edge [color="#587085", fontname="Helvetica", fontsize=10];
+  train [label="Training loader\nGradient updates"];
+  module [label="MNISTClassifier + Trainer.fit\nCNN + cross-entropy + Adam"];
+  val [label="Validation loader\nNo gradient updates"];
+  metrics [label="Epoch loss and accuracy\nCSV + learning curves"];
+  monitor [label="Monitor validation loss\nSelect best / early stop", fillcolor="#fff2d6"];
+  best [label="best.ckpt\nLowest validation loss", fillcolor="#e7f5e9"];
+  last [label="last.ckpt\nLatest completed epoch", fillcolor="#e7f5e9"];
+  resume [label="train --resume\nRestore weights, optimizer,\nepoch, callbacks, exact splits\nWrite into a new run"];
+  test [label="test --checkpoint\nFresh process, fixed weights\nEntire ordered test loader"];
+  report [label="metrics.json\nLoss, accuracy, count,\ncheckpoint hash + environment"];
+  train -> module;
+  val -> module;
+  module -> metrics;
+  metrics -> monitor;
+  monitor -> best [label="When improved"];
+  module -> last [label="Every completed epoch"];
+  last -> resume;
+  best -> resume [style=dashed, label="Retain best history"];
+  best -> test [label="Explicit command only"];
+  test -> report;
+}

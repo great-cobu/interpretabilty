@@ -12,8 +12,8 @@ main :-
 generate_all_experiment_configs :-
     ensure_generated_dir(GenDir),
     forall(
-        experiment_spec(ExpId, ModelId, DatasetId, RunName, Epochs, BatchSize, LR),
-        generate_experiment_yaml(GenDir, ExpId, ModelId, DatasetId, RunName, Epochs, BatchSize, LR)
+        experiment_spec(ExpId, ModelId, DatasetId, RunName, Params),
+        generate_experiment_yaml(GenDir, ExpId, ModelId, DatasetId, RunName, Params)
     ).
 
 ensure_generated_dir(GenDir) :-
@@ -28,14 +28,25 @@ ensure_generated_dir(GenDir) :-
     ;   make_directory(GenDir)
     ).
 
-model_defaults(logistic, 0.0, 0.0001).
-model_defaults(mnist_cnn, 0.2, 0.0).
+param_or_default(Key, Params, Default, Value) :-
+    Term =.. [Key, Value],
+    (   member(Term, Params)
+    ->  true
+    ;   Value = Default
+    ).
 
-generate_experiment_yaml(GenDir, ExpId, ModelId, DatasetId, RunName, Epochs, BatchSize, LR) :-
+model_dropout(logistic, 0.0).
+model_dropout(mnist_cnn, 0.2).
+
+generate_experiment_yaml(GenDir, ExpId, ModelId, DatasetId, RunName, Params) :-
     model_spec(ModelId, _, _, _, ExperimentName),
     dataset_spec(DatasetId, DataRoot, _, _, _, _),
     service_config(ml, mlflow_tracking_uri, TrackingURI),
-    model_defaults(ModelId, Dropout, WeightDecay),
+    model_dropout(ModelId, Dropout),
+    param_or_default(epochs, Params, 1, Epochs),
+    param_or_default(batch_size, Params, 256, BatchSize),
+    param_or_default(learning_rate, Params, 0.001, LR),
+    param_or_default(weight_decay, Params, 0.0, WeightDecay),
     experiment_run_dir(ExpId, RunDir),
     atomic_list_concat([GenDir, '/', ExpId, '.yaml'], TargetFile),
     open(TargetFile, write, Stream),

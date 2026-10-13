@@ -28,15 +28,18 @@ swipl -q -g "
     assertion(validate_experiments),
     assertion(compatible(logistic, mnist)),
     assertion(compatible(mnist_cnn, mnist)),
-    assertion(active_experiment_details(
-        logistic_container,
-        logistic,
-        mnist,
-        'mnist-logistic',
-        'configs/generated/logistic_container.yaml',
-        'runs/logistic-container-demo',
-        'notebooks/logistic_demo.py',
-        'mnist-logistic-interpretability'
+    assertion((
+        active_experiment(ActiveExp),
+        active_experiment_details(
+            ActiveExp,
+            _ModelId,
+            mnist,
+            _CliCommand,
+            _ConfigPath,
+            _RunDir,
+            _NotebookPath,
+            _ExperimentName
+        )
     )),
     writeln('    ✓ All standard Prolog unit and model/dataset registry assertions passed!'),
     halt.
@@ -54,9 +57,10 @@ MLOPS_STORAGE_BASE="/tmp/test_mlops_volumes" swipl -q -g "
 
 echo "==> 3. Testing .env file generation..."
 swipl -q -t main -f prolog/gen_env.pl
-grep -q "ACTIVE_MODEL=logistic" docker/ml/.env
-grep -q "ACTIVE_CLI=mnist-logistic" docker/ml/.env
-grep -q "ACTIVE_CONFIG=configs/generated/logistic_container.yaml" docker/ml/.env
+grep -q "^ACTIVE_EXPERIMENT=" docker/ml/.env
+grep -q "^ACTIVE_MODEL=" docker/ml/.env
+grep -q "^ACTIVE_CLI=" docker/ml/.env
+grep -q "^ACTIVE_CONFIG=configs/generated/" docker/ml/.env
 echo "    ✓ .env files generated and verified successfully!"
 
 echo "==> 4. Testing docker-compose.yml generation..."

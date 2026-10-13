@@ -14,11 +14,9 @@ from models.logistic.evaluate import (
     confusion_matrix,
     load_classifier,
     predict,
-    save_class_templates_plot,
-    save_confusion_matrix_plot,
 )
 from models.logistic.model import LogisticClassifier, LogisticRegression, inspect_model
-from models.logistic.train import train_demo
+from models.logistic.train import fit_demo
 
 
 @pytest.mark.parametrize("batch_size", [1, 7, 32])
@@ -94,13 +92,13 @@ def test_logistic_cli_and_module_help():
     assert console.returncode == mod_main.returncode == 0
 
 
-def test_logistic_train_resume_test_and_predict_end_to_end(tmp_path, patch_mnist):
+def test_logistic_lbfgs_fit_test_and_predict_end_to_end(tmp_path, patch_mnist):
     run1 = tmp_path / "run1"
     rc = main([
         "train",
         "--config", "configs/logistic.yaml",
         "--accelerator", "cpu",
-        "--max-epochs", "2",
+        "--weight-decay", "0.01",
         "--batch-size", "4",
         "--output-dir", str(run1),
     ])
@@ -108,31 +106,18 @@ def test_logistic_train_resume_test_and_predict_end_to_end(tmp_path, patch_mnist
     assert (run1 / "checkpoints/best.ckpt").is_file()
     assert (run1 / "checkpoints/last.ckpt").is_file()
     assert (run1 / "checkpoints/manifest.json").is_file()
-    assert (run1 / "learning_curves.png").is_file()
     assert (run1 / "class_templates.png").is_file()
     summary1 = json.loads((run1 / "training_summary.json").read_text())
     assert summary1["model"] == "LogisticRegression"
-    assert summary1["completed_epochs"] == 2
-
-    # Resume to epoch 3
-    run2 = tmp_path / "run2"
-    rc_resume = main([
-        "train",
-        "--resume", str(run1 / "checkpoints/last.ckpt"),
-        "--accelerator", "cpu",
-        "--max-epochs", "3",
-        "--output-dir", str(run2),
-    ])
-    assert rc_resume == 0
-    summary2 = json.loads((run2 / "training_summary.json").read_text())
-    assert summary2["completed_epochs"] == 3
-    assert summary2["resumed_from_epoch"] == 2
+    assert summary1["solver"] == "L-BFGS"
+    assert summary1["weight_decay"] == 0.01
+    assert summary1["solver_iterations"] >= 1
 
     # Test checkpoint
     test_out = tmp_path / "test_out"
     rc_test = main([
         "test",
-        "--checkpoint", str(run2 / "checkpoints/best.ckpt"),
+        "--checkpoint", str(run1 / "checkpoints/best.ckpt"),
         "--accelerator", "cpu",
         "--output-dir", str(test_out),
     ])
@@ -146,7 +131,7 @@ def test_logistic_train_resume_test_and_predict_end_to_end(tmp_path, patch_mnist
     assert len(metrics["confusion_matrix"]) == 10
 
     # Load classifier and run predict() + confusion_matrix()
-    clf = load_classifier(run2 / "checkpoints/best.ckpt")
+    clf = load_classifier(run1 / "checkpoints/best.ckpt")
     sample_imgs = torch.randn(3, 1, 28, 28)
     preds = predict(clf, sample_imgs)
     assert preds["predictions"].shape == (3,)
@@ -174,7 +159,6 @@ def test_logistic_mlflow_tracking_and_artifacts(tmp_path, patch_mnist):
         "train",
         "--config", "configs/generated/logistic_container.yaml",
         "--accelerator", "cpu",
-        "--max-epochs", "2",
         "--batch-size", "4",
         "--tracking-enabled",
         "--tracking-uri", tracking_uri,
@@ -195,21 +179,20 @@ def test_logistic_mlflow_tracking_and_artifacts(tmp_path, patch_mnist):
     ])
     assert rc_test == 0
 
-    client = mlflow.tracking.MlflowClient(tracking_uri=tracking_uri)
     logged_run = client.get_run(run_id)
+    assert logged_run.data.params.get("solver") == "L-BFGS"
     assert "test/accuracy" in logged_run.data.metrics
     assert "val/loss" in logged_run.data.metrics
 
     train_artifacts = {a.path for a in client.list_artifacts(run_id, "training")}
     eval_artifacts = {a.path for a in client.list_artifacts(run_id, "evaluation")}
     assert "training/class_templates.png" in train_artifacts
-    assert "training/learning_curves.png" in train_artifacts
     assert "evaluation/confusion_matrix.png" in eval_artifacts
     assert "evaluation/sample_attributions.png" in eval_artifacts
 
 
-def test_logistic_train_demo_helper(tmp_path, patch_mnist):
-    out = train_demo(tmp_path, epochs=1, threads=1)
+def test_logistic_fit_demo_helper(tmp_path, patch_mnist):
+    out = fit_demo(tmp_path, weight_decay=0.01, threads=1)
     assert (out / "training_summary.json").is_file()
     assert (out / "checkpoints/best.ckpt").is_file()
     assert (out / "class_templates.png").is_file()

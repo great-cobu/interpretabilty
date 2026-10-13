@@ -99,7 +99,7 @@ model_spec(
     mnist_cnn,
     'models.MNIST',
     'mnist-cnn',
-    'notebooks/mnist_cnn_demo.py',
+    'notebooks/mnist_demo.py',
     'mnist-cnn-interpretability'
 ).
 
@@ -110,41 +110,53 @@ dataset_spec(mnist, 'data', 1, 28, 10, 0.1).
 compatible(logistic, mnist).
 compatible(mnist_cnn, mnist).
 
-% experiment_spec(ExpId, ModelId, DatasetId, RunName, Epochs, BatchSize, LearningRate)
+% experiment_spec(ExpId, ModelId, DatasetId, RunName, Params)
+% - logistic is solved to convex optimality via L-BFGS (parameterized by weight_decay, never epochs)
+% - mnist_cnn is trained via mini-batch Adam over epochs
 experiment_spec(
     logistic_container,
     logistic,
     mnist,
     'logistic-container-demo',
-    10,
-    64,
-    0.001
+    [weight_decay(0.01)]
 ).
 experiment_spec(
     mnist_cnn_container,
     mnist_cnn,
     mnist,
     'mnist-cnn-container-demo',
-    5,
-    64,
-    0.001
+    [epochs(5), batch_size(64), learning_rate(0.001)]
 ).
 
 % Active experiment driving the container environment and test pipeline
-active_experiment(logistic_container).
+active_experiment(mnist_cnn_container).
+
+% Model-specific parameter validation rules
+valid_model_params(logistic, Params) :-
+    member(weight_decay(WD), Params),
+    WD >= 0,
+    \+ member(epochs(_), Params).
+
+valid_model_params(mnist_cnn, Params) :-
+    member(epochs(Epochs), Params),
+    Epochs > 0,
+    member(batch_size(BatchSize), Params),
+    BatchSize > 0,
+    member(learning_rate(LR), Params),
+    LR > 0.
 
 % Resolved details for an experiment
 experiment_config_path(ExpId, ConfigPath) :-
-    experiment_spec(ExpId, _, _, _, _, _, _),
+    experiment_spec(ExpId, _, _, _, _),
     atomic_list_concat(['configs/generated/', ExpId, '.yaml'], ConfigPath).
 
 experiment_run_dir(ExpId, RunDir) :-
-    experiment_spec(ExpId, _, _, RunName, _, _, _),
+    experiment_spec(ExpId, _, _, RunName, _),
     atomic_list_concat(['runs/', RunName], RunDir).
 
 active_experiment_details(ExpId, ModelId, DatasetId, CliCommand, ConfigPath, RunDir, NotebookPath, ExperimentName) :-
     active_experiment(ExpId),
-    experiment_spec(ExpId, ModelId, DatasetId, _, _, _, _),
+    experiment_spec(ExpId, ModelId, DatasetId, _, _),
     model_spec(ModelId, _, CliCommand, NotebookPath, ExperimentName),
     experiment_config_path(ExpId, ConfigPath),
     experiment_run_dir(ExpId, RunDir).
@@ -152,15 +164,14 @@ active_experiment_details(ExpId, ModelId, DatasetId, CliCommand, ConfigPath, Run
 % Validate all registered experiments and the active experiment
 validate_experiments :-
     active_experiment(ActiveExp),
-    experiment_spec(ActiveExp, _, _, _, _, _, _),
+    experiment_spec(ActiveExp, _, _, _, _),
     forall(
-        experiment_spec(ExpId, ModelId, DatasetId, _, Epochs, BatchSize, LR),
-        (   model_spec(ModelId, _, _, _, _),
+        experiment_spec(ExpId, ModelId, DatasetId, _, Params),
+        (   model_spec(ModelId, _, _, NotebookPath, _),
+            exists_file(NotebookPath),
             dataset_spec(DatasetId, _, _, _, _, _),
             compatible(ModelId, DatasetId),
-            Epochs > 0,
-            BatchSize > 0,
-            LR > 0
+            valid_model_params(ModelId, Params)
         ->  true
         ;   format(user_error, 'Invalid experiment specification: ~w~n', [ExpId]),
             fail

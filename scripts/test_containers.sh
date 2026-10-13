@@ -87,10 +87,13 @@ assert test_acc >= 0.90, f"Expected test/accuracy >= 0.90, got {test_acc}"
 
 train_artifacts = {a.path for a in client.list_artifacts(run_id, "training")}
 eval_artifacts = {a.path for a in client.list_artifacts(run_id, "evaluation")}
-assert "training/class_templates.png" in train_artifacts, f"Missing class_templates.png: {train_artifacts}"
-assert "training/learning_curves.png" in train_artifacts, f"Missing learning_curves.png: {train_artifacts}"
-assert "evaluation/confusion_matrix.png" in eval_artifacts, f"Missing confusion_matrix.png: {eval_artifacts}"
-assert "evaluation/sample_attributions.png" in eval_artifacts, f"Missing sample_attributions.png: {eval_artifacts}"
+assert "evaluation/metrics.json" in eval_artifacts, f"Missing metrics.json: {eval_artifacts}"
+if os.environ.get("ACTIVE_MODEL") == "logistic":
+    assert "training/class_templates.png" in train_artifacts, f"Missing class_templates.png: {train_artifacts}"
+    assert "evaluation/confusion_matrix.png" in eval_artifacts, f"Missing confusion_matrix.png: {eval_artifacts}"
+    assert "evaluation/sample_attributions.png" in eval_artifacts, f"Missing sample_attributions.png: {eval_artifacts}"
+else:
+    assert "training/learning_curves.png" in train_artifacts, f"Missing learning_curves.png: {train_artifacts}"
 
 # Verify RustFS health & Marimo server inside container
 with urllib.request.urlopen("http://rustfs:8088/health", timeout=5) as resp:

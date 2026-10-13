@@ -19,7 +19,7 @@ def _():
     from models.MNIST.data import MNISTDataModule
     from models.logistic.evaluate import confusion_matrix
     from models.logistic.model import LogisticClassifier, LogisticRegression
-    from models.logistic.train import train_demo
+    from models.logistic.train import fit_demo
 
     def notebook_md(text, *, supporting=False):
         """Render prose with the shared theme; use Markdown heading levels."""
@@ -27,46 +27,66 @@ def _():
         return mo.Html(f'<div class="{_classes}">{mo.md(text).text}</div>')
 
     root = Path(__file__).resolve().parents[1]
-    return DataConfig, LogisticClassifier, LogisticRegression, MNISTDataModule, confusion_matrix, json, mo, notebook_md, np, os, plt, replace, root, torch, train_demo
+    return DataConfig, LogisticClassifier, LogisticRegression, MNISTDataModule, confusion_matrix, fit_demo, json, mo, notebook_md, np, os, plt, replace, root, torch
 
 
 @app.cell(hide_code=True)
 def _(notebook_md):
     notebook_md(r"""
     # MNIST Logistic Regression — Glass-Box Interpretability Demo
-    Explore cached MNIST validation digits, train a fast multinomial logistic regression model ($7,850$ parameters),
-    and inspect its **exact linear pixel attributions** ($x \odot W_c$) and **learned spatial class templates** ($W_c \in \mathbb{R}^{28 \times 28}$).
+    Multinomial logistic regression minimizes a **strictly convex** L2-regularized cross-entropy objective:
+    $$\min_{W, b} \; -\frac{1}{N}\sum_{i=1}^N \log P(y_i \mid x_i; W, b) + \frac{\lambda}{2}\|W\|_F^2$$
+    Unlike a multi-layer neural network trained over mini-batch epochs, this model has a **unique global optimum** solved directly to convergence via **L-BFGS**, yielding **exact linear pixel attributions** ($x \odot W_c$) and **spatial class templates** ($W_c \in \mathbb{R}^{28 \times 28}$).
     """, supporting=True)
     return
 
 
 @app.cell
 def _(mo, notebook_md, os):
-    training_form = mo.ui.dictionary({
-        "epochs": mo.ui.number(1, 100, step=1, value=3, label="Training epochs"),
-        "threads": mo.ui.number(1, os.cpu_count() or 1, step=1,
-                                value=min(8, os.cpu_count() or 1), label="Training CPU threads"),
-    }).form(submit_button_label="Train new logistic demo run")
+    fitting_form = mo.ui.dictionary({
+        "weight_decay": mo.ui.dropdown(
+            options={
+                "λ = 0.0001 (weak L2 — sharp/noisy templates)": 0.0001,
+                "λ = 0.001 (light L2 regularization)": 0.001,
+                "λ = 0.01 (balanced L2 — smooth templates)": 0.01,
+                "λ = 0.1 (strong L2 — heavily smoothed templates)": 0.1,
+            },
+            value="λ = 0.01 (balanced L2 — smooth templates)",
+            label="L2 Regularization (λ)",
+        ),
+        "threads": mo.ui.number(
+            1, os.cpu_count() or 1, step=1,
+            value=min(8, os.cpu_count() or 1), label="Solver CPU threads",
+        ),
+    }).form(submit_button_label="Fit convex L-BFGS model")
     mo.vstack([
-        notebook_md("## Train a Logistic Regression demo\nChoose the number of epochs, then press **Train new logistic demo run**. "
-                    "Each epoch trains on 20 batches and validates on 5 batches on CPU in milliseconds.", supporting=True),
-        training_form,
+        notebook_md(
+            "## Fit Convex Logistic Regression (L-BFGS)\n"
+            "Select the L2 regularization strength $\\lambda$, then press **Fit convex L-BFGS model**. "
+            "Larger $\\lambda$ penalizes large weights and produces smoother spatial templates $W_c$.",
+            supporting=True,
+        ),
+        fitting_form,
     ])
-    return (training_form,)
+    return (fitting_form,)
 
 
 @app.cell
-def _(mo, notebook_md, root, train_demo, training_form):
+def _(fit_demo, fitting_form, mo, notebook_md, root):
     trained_run = None
     training_error = None
-    if training_form.value is not None:
+    if fitting_form.value is not None:
         try:
-            with mo.status.spinner(title="Training logistic regression demo…"):
-                trained_run = train_demo(root, int(training_form.value["epochs"]), int(training_form.value["threads"]))
+            with mo.status.spinner(title="Solving convex L-BFGS optimization to convergence…"):
+                trained_run = fit_demo(
+                    root,
+                    weight_decay=float(fitting_form.value["weight_decay"]),
+                    threads=int(fitting_form.value["threads"]),
+                )
         except (OSError, RuntimeError, ValueError) as exc:
             training_error = str(exc)
-    notebook_md(f"Training failed: {training_error}" if training_error else
-                f"Saved run: `{trained_run}`" if trained_run else "")
+    notebook_md(f"Solver failed: {training_error}" if training_error else
+                f"Saved converged run: `{trained_run}`" if trained_run else "")
     return (trained_run,)
 
 
@@ -149,8 +169,8 @@ def _(LogisticClassifier, notebook_md, selected_run):
         except (OSError, RuntimeError, ValueError, KeyError) as exc:
             checkpoint_error = str(exc)
     notebook_md(f"Checkpoint unavailable: {checkpoint_error}" if checkpoint_error else
-                "Predictions and glass-box attributions use this run's best checkpoint on CPU." if classifier else
-                "Select or train a Logistic Regression run to enable predictions.")
+                "Predictions and glass-box attributions use this run's converged checkpoint on CPU." if classifier else
+                "Select or fit a Logistic Regression run to enable predictions.")
     return (classifier,)
 
 
@@ -217,7 +237,7 @@ def _(classifier, data, data_error, mo, notebook_md, np, plt, sample_index, targ
         _axes[0].axis("off")
 
         if classifier is not None:
-            with torch.inference_mode():
+            with torch.no_grad():
                 _batch = _image.unsqueeze(0)
                 _logits = classifier(_batch)[0]
                 _probs = _logits.softmax(dim=0).numpy()
@@ -234,7 +254,7 @@ def _(classifier, data, data_error, mo, notebook_md, np, plt, sample_index, targ
             _axes[1].set_title(f"Attribution x ⊙ W_{_target_c} (class {_target_c})")
             _axes[1].axis("off")
 
-            _bars = _axes[2].bar(range(10), _probs, color=["#1d4ed8" if i == _target_c else "#94a3b8" for i in range(10)])
+            _axes[2].bar(range(10), _probs, color=["#1d4ed8" if i == _target_c else "#94a3b8" for i in range(10)])
             _axes[2].set_xticks(range(10))
             _axes[2].set_ylim(0, 1)
             _axes[2].set_title(f"Prediction: {_pred} ({_probs[_pred]:.1%})")
@@ -260,7 +280,7 @@ def _(classifier, data, data_error, mo, notebook_md, np, plt, sample_index, targ
 
 @app.cell
 def _(classifier, mo, notebook_md, np, plt):
-    templates_view = notebook_md("Select a trained run to inspect learned class weight templates.")
+    templates_view = notebook_md("Select a converged run to inspect learned class weight templates.")
     if classifier is not None:
         _templates = classifier.get_class_templates().numpy()
         _vmax = max(float(np.abs(_templates).max()), 1e-4)
@@ -285,16 +305,23 @@ def _(classifier, mo, notebook_md, np, plt):
 
 @app.cell
 def _(config, mo, notebook_md, run_error, selected_run, summary):
+    _solver_desc = ""
+    if summary is not None:
+        _solver = summary.get("solver", "L-BFGS")
+        _iters = summary.get("solver_iterations", summary.get("global_step", "?"))
+        _wd = summary.get("weight_decay", "?")
+        _solver_desc = (
+            f"**{selected_run.name}** · Solver: **{_solver}** · "
+            f"L2 regularization $\\lambda = {_wd}$ · "
+            f"Solver iterations: **{_iters}** ·Subset smoke run: {summary.get('smoke_run', False)}"
+        )
     mo.vstack([
-        notebook_md("## Saved training results"),
+        notebook_md("## Convex optimization summary"),
         notebook_md(f"Unable to read run: {run_error}" if run_error else
-                    "Choose a training run above." if summary is None else
-                    f"**{selected_run.name}** · {summary['completed_epochs']} completed epochs · "
-                    f"{summary['global_step']} optimizer steps · smoke run: {summary['smoke_run']}"),
+                    "Choose a saved run above." if summary is None else
+                    _solver_desc),
         mo.ui.table([summary["metrics"]]) if summary else notebook_md("No saved Logistic Regression runs yet."),
         mo.accordion({"Resolved configuration": notebook_md(f"```yaml\n{config}\n```")}) if config else notebook_md(""),
-        mo.image((selected_run / "learning_curves.png").read_bytes())
-        if selected_run and (selected_run / "learning_curves.png").is_file() else notebook_md("No learning curve image available."),
     ])
     return
 

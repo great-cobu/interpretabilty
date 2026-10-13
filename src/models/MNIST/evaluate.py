@@ -49,7 +49,32 @@ def test_checkpoint(config: Config, output: Path, checkpoint_path: str | Path) -
         "environment": environment(),
         "elapsed_seconds": elapsed,
     }
-    (output / "metrics.json").write_text(json.dumps(report, indent=2) + "\n")
+    metrics_file = output / "metrics.json"
+    metrics_file.write_text(json.dumps(report, indent=2) + "\n")
+
+    if config.tracking.enabled and config.tracking.uri:
+        import mlflow
+
+        mlflow.set_tracking_uri(config.tracking.uri)
+        mlflow.set_experiment(config.tracking.experiment_name)
+        run_id = None
+        summary_candidate = Path(checkpoint_path).resolve().parent.parent / "training_summary.json"
+        if summary_candidate.is_file():
+            try:
+                run_id = json.loads(summary_candidate.read_text()).get("mlflow_run_id")
+            except (OSError, json.JSONDecodeError):
+                run_id = None
+        with mlflow.start_run(run_id=run_id, run_name=config.tracking.run_name or "mnist-cnn-eval") as active_run:
+            mlflow.log_metrics(
+                {
+                    "test/loss": report["test/loss"],
+                    "test/accuracy": report["test/accuracy"],
+                    "test/sample_count": float(report["sample_count"]),
+                }
+            )
+            mlflow.log_artifact(str(metrics_file), artifact_path="evaluation")
+            report["mlflow_run_id"] = active_run.info.run_id
+
     return report
 
 

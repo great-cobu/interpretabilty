@@ -33,9 +33,6 @@ COPY src /workspace/src
 # Sync locked dependencies, MLflow extra, dev (pytest), and notebooks (marimo) into /opt/venv
 RUN uv sync --locked --extra mlflow --group dev --group notebooks
 
-# Copy remaining project files
-COPY . /workspace
-
 # Ensure runtime directories exist
 RUN mkdir -p /workspace/.cache \
              /workspace/datasets \

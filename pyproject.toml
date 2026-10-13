@@ -38,6 +38,7 @@ notebooks = [
 
 [project.scripts]
 mnist-cnn = "models.MNIST.cli:main"
+mnist-logistic = "models.logistic.cli:main"
 models = "models.main:main"
 interpetability = "models.main:main"
 

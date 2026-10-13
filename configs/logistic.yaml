@@ -1,0 +1,32 @@
+# Baseline configuration for MNIST Multinomial Logistic Regression.
+data:
+  directory: data
+  download: true
+  split_seed: 42
+  batch_size: 64
+  num_workers: 0
+  mean: 0.1307
+  std: 0.3081
+  split_indices: null
+model:
+  dropout: 0.0
+optimizer:
+  learning_rate: 0.001
+  weight_decay: 0.0001
+trainer:
+  seed: 42
+  max_epochs: 10
+  accelerator: auto
+  devices: 1
+  precision: 32-true
+  deterministic: true
+  patience: 3
+  limit_train_batches: null
+  limit_val_batches: null
+tracking:
+  enabled: false
+  uri: null
+  experiment_name: mnist-logistic
+  run_name: null
+  tags: {}
+output_dir: null

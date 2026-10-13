@@ -34,14 +34,14 @@ service_config(mariadb, user, 'mlflow_user').
 service_config(mariadb, password, 'mlflow_pass_change_me').
 service_config(mariadb, port, 3306).
 
-% MLFlow Configuration
-service_config(mlflow, port, 5000).
-service_config(mlflow, tracking_uri, 'http://localhost:5000').
+% MLFlow Configuration (5050 avoids macOS ControlCenter/AirPlay on 5000)
+service_config(mlflow, port, 5050).
+service_config(mlflow, tracking_uri, 'http://localhost:5050').
 service_config(mlflow, python_version, PythonVersion) :-
     global_config(python_version, PythonVersion).
 
-% RustFS Configuration
-service_config(rustfs, port, 8080).
+% RustFS Configuration (8088 avoids local services on 8080)
+service_config(rustfs, port, 8088).
 service_config(rustfs, data_dir, '/data').
 
 % ML Development & Demo Container Configuration

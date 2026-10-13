@@ -93,7 +93,7 @@ assert "evaluation/confusion_matrix.png" in eval_artifacts, f"Missing confusion_
 assert "evaluation/sample_attributions.png" in eval_artifacts, f"Missing sample_attributions.png: {eval_artifacts}"
 
 # Verify RustFS health & Marimo server inside container
-with urllib.request.urlopen("http://rustfs:8080/health", timeout=5) as resp:
+with urllib.request.urlopen("http://rustfs:8088/health", timeout=5) as resp:
     assert resp.status == 200
 with urllib.request.urlopen("http://localhost:2718", timeout=5) as resp:
     assert resp.status == 200
@@ -104,10 +104,16 @@ print(f"    ✓ Validation Accuracy:         {val_acc:.4f}")
 print(f"    ✓ Test Split Accuracy:         {test_acc:.4f} ({metrics['sample_count']} test digits)")
 print(f"    ✓ Logged Training Artifacts:   {sorted(train_artifacts)}")
 print(f"    ✓ Logged Evaluation Artifacts: {sorted(eval_artifacts)}")
-print("    ✓ RustFS (:8080) and Marimo (:2718) HTTP endpoints verified!")
+print("    ✓ Internal container HTTP endpoints verified!")
 PYEOF
 
+echo "==> Step 8: Verifying host-accessible URLs (localhost:${MLFLOW_PORT}, localhost:${RUSTFS_PORT}, localhost:${MARIMO_PORT})..."
+curl -sf "http://localhost:${MLFLOW_PORT}/health" > /dev/null
+curl -sf "http://localhost:${RUSTFS_PORT}/health" > /dev/null
+curl -sf "http://localhost:${MARIMO_PORT}" > /dev/null
+echo "    ✓ Host HTTP endpoints verified!"
+
 echo "==> All container services, tests, training, evaluation, and UI endpoints succeeded!"
-echo "    • MLflow UI:      http://localhost:5000"
-echo "    • Marimo Demo UI: http://localhost:2718"
-echo "    • RustFS Storage: http://localhost:8080/artifacts/mlflow/"
+echo "    • MLflow UI:      http://localhost:${MLFLOW_PORT}"
+echo "    • Marimo Demo UI: http://localhost:${MARIMO_PORT}"
+echo "    • RustFS Storage: http://localhost:${RUSTFS_PORT}/artifacts/mlflow/"

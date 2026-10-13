@@ -26,7 +26,7 @@ trainer:
   limit_val_batches: null
 tracking:
   enabled: true
-  uri: http://mlflow:5000
+  uri: http://mlflow:5050
   experiment_name: mnist-logistic-interpretability
   run_name: logistic-container-demo
   tags:

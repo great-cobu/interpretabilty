@@ -29,17 +29,17 @@ services:
     env_file:
       - ./docker/rustfs/.env
     environment:
-      RUSTFS_LISTEN_ADDR: "0.0.0.0:8080"
+      RUSTFS_LISTEN_ADDR: "0.0.0.0:8088"
       RUSTFS_DATA_DIR: "/data"
     ports:
-      - "8080:8080"
+      - "8088:8088"
     volumes:
       - "./mlops_volumes/rustfs:/data"
       - "./mlops_volumes/mlflow:/data/mlflow"
     networks:
       - mlops_network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8088/health"]
       timeout: 5s
       retries: 5
 
@@ -57,14 +57,14 @@ services:
     command: >
       sh -c "mlflow server
       --host 0.0.0.0
-      --port 5000
+      --port 5050
       --allowed-hosts '*'
       --backend-store-uri mysql+pymysql://$${MARIADB_USER}:$${MARIADB_PASSWORD}@mariadb:3306/$${MARIADB_DATABASE}
       --default-artifact-root /artifacts
       --serve-artifacts
       --artifacts-destination /artifacts"
     ports:
-      - "5000:5000"
+      - "5050:5050"
     volumes:
       - "./mlops_volumes/mlflow:/artifacts"
     networks:
@@ -75,9 +75,9 @@ services:
       rustfs:
         condition: service_healthy
     environment:
-      MLFLOW_TRACKING_URI: http://mlflow:5000
+      MLFLOW_TRACKING_URI: http://mlflow:5050
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:5050/health"]
       timeout: 5s
       retries: 5
 
@@ -111,7 +111,7 @@ services:
       rustfs:
         condition: service_healthy
     environment:
-      MLFLOW_TRACKING_URI: "http://mlflow:5000"
+      MLFLOW_TRACKING_URI: "http://mlflow:5050"
       PYTHONUNBUFFERED: "1"
     stdin_open: true
     tty: true

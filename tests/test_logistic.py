@@ -10,7 +10,13 @@ from torch.nn import functional as F
 
 from models.MNIST.config import load_config
 from models.logistic.cli import main
-from models.logistic.evaluate import confusion_matrix, load_classifier, predict
+from models.logistic.evaluate import (
+    confusion_matrix,
+    load_classifier,
+    predict,
+    save_class_templates_plot,
+    save_confusion_matrix_plot,
+)
 from models.logistic.model import LogisticClassifier, LogisticRegression, inspect_model
 from models.logistic.train import train_demo
 
@@ -74,6 +80,14 @@ def test_inspect_logistic_model_writes_summary(tmp_path):
     assert (tmp_path / "model_summary.json").is_file()
 
 
+def test_prolog_generated_logistic_config_loads():
+    cfg = load_config("configs/generated/logistic_container.yaml", use_environment=False)
+    assert cfg.tracking.enabled is True
+    assert cfg.tracking.experiment_name == "mnist-logistic-interpretability"
+    assert cfg.tracking.tags.get("model") == "logistic"
+    assert cfg.tracking.tags.get("managed_by") == "swi-prolog"
+
+
 def test_logistic_cli_and_module_help():
     console = subprocess.run(["mnist-logistic", "--help"], capture_output=True, text=True)
     mod_main = subprocess.run([sys.executable, "-m", "models.logistic", "--help"], capture_output=True, text=True)
@@ -95,6 +109,7 @@ def test_logistic_train_resume_test_and_predict_end_to_end(tmp_path, patch_mnist
     assert (run1 / "checkpoints/last.ckpt").is_file()
     assert (run1 / "checkpoints/manifest.json").is_file()
     assert (run1 / "learning_curves.png").is_file()
+    assert (run1 / "class_templates.png").is_file()
     summary1 = json.loads((run1 / "training_summary.json").read_text())
     assert summary1["model"] == "LogisticRegression"
     assert summary1["completed_epochs"] == 2
@@ -122,9 +137,13 @@ def test_logistic_train_resume_test_and_predict_end_to_end(tmp_path, patch_mnist
         "--output-dir", str(test_out),
     ])
     assert rc_test == 0
+    assert (test_out / "confusion_matrix.png").is_file()
+    assert (test_out / "class_templates.png").is_file()
+    assert (test_out / "sample_attributions.png").is_file()
     metrics = json.loads((test_out / "metrics.json").read_text())
     assert metrics["model"] == "LogisticRegression"
     assert metrics["sample_count"] == 7
+    assert len(metrics["confusion_matrix"]) == 10
 
     # Load classifier and run predict() + confusion_matrix()
     clf = load_classifier(run2 / "checkpoints/best.ckpt")
@@ -140,7 +159,57 @@ def test_logistic_train_resume_test_and_predict_end_to_end(tmp_path, patch_mnist
     assert int(cm.sum()) == 10
 
 
+def test_logistic_mlflow_tracking_and_artifacts(tmp_path, patch_mnist):
+    import mlflow
+
+    mlflow_db = tmp_path / "mlflow.db"
+    tracking_uri = f"sqlite:///{mlflow_db}"
+    artifact_root = (tmp_path / "mlartifacts").resolve().as_uri()
+    client = mlflow.tracking.MlflowClient(tracking_uri=tracking_uri)
+    client.create_experiment("mnist-logistic-interpretability", artifact_location=artifact_root)
+    run_dir = tmp_path / "mlflow_run"
+    test_dir = tmp_path / "mlflow_eval"
+
+    rc_train = main([
+        "train",
+        "--config", "configs/generated/logistic_container.yaml",
+        "--accelerator", "cpu",
+        "--max-epochs", "2",
+        "--batch-size", "4",
+        "--tracking-enabled",
+        "--tracking-uri", tracking_uri,
+        "--output-dir", str(run_dir),
+    ])
+    assert rc_train == 0
+    summary = json.loads((run_dir / "training_summary.json").read_text())
+    run_id = summary.get("mlflow_run_id")
+    assert run_id is not None
+
+    rc_test = main([
+        "test",
+        "--checkpoint", str(run_dir / "checkpoints/best.ckpt"),
+        "--accelerator", "cpu",
+        "--tracking-enabled",
+        "--tracking-uri", tracking_uri,
+        "--output-dir", str(test_dir),
+    ])
+    assert rc_test == 0
+
+    client = mlflow.tracking.MlflowClient(tracking_uri=tracking_uri)
+    logged_run = client.get_run(run_id)
+    assert "test/accuracy" in logged_run.data.metrics
+    assert "val/loss" in logged_run.data.metrics
+
+    train_artifacts = {a.path for a in client.list_artifacts(run_id, "training")}
+    eval_artifacts = {a.path for a in client.list_artifacts(run_id, "evaluation")}
+    assert "training/class_templates.png" in train_artifacts
+    assert "training/learning_curves.png" in train_artifacts
+    assert "evaluation/confusion_matrix.png" in eval_artifacts
+    assert "evaluation/sample_attributions.png" in eval_artifacts
+
+
 def test_logistic_train_demo_helper(tmp_path, patch_mnist):
     out = train_demo(tmp_path, epochs=1, threads=1)
     assert (out / "training_summary.json").is_file()
     assert (out / "checkpoints/best.ckpt").is_file()
+    assert (out / "class_templates.png").is_file()

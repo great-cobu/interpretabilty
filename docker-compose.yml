@@ -12,7 +12,7 @@ services:
     ports:
       - "3306:3306"
     volumes:
-      - "/Volumes/Macintosh HD/mlops_volumes/mariadb:/var/lib/mysql"
+      - "./mlops_volumes/mariadb:/var/lib/mysql"
     networks:
       - mlops_network
     healthcheck:
@@ -34,7 +34,8 @@ services:
     ports:
       - "8080:8080"
     volumes:
-      - "/Volumes/Macintosh HD/mlops_volumes/rustfs:/data"
+      - "./mlops_volumes/rustfs:/data"
+      - "./mlops_volumes/mlflow:/data/mlflow"
     networks:
       - mlops_network
     healthcheck:
@@ -47,26 +48,31 @@ services:
       context: .
       dockerfile: docker/mlflow/Dockerfile
       args:
-        PYTHON_VERSION: "3.11"
+        PYTHON_VERSION: "3.14"
     container_name: mlops_mlflow
     restart: unless-stopped
     env_file:
       - ./docker/mlflow/.env
       - ./docker/mariadb/.env
     command: >
-      mlflow server
+      sh -c "mlflow server
       --host 0.0.0.0
       --port 5000
+      --allowed-hosts '*'
       --backend-store-uri mysql+pymysql://$${MARIADB_USER}:$${MARIADB_PASSWORD}@mariadb:3306/$${MARIADB_DATABASE}
       --default-artifact-root /artifacts
+      --serve-artifacts
+      --artifacts-destination /artifacts"
     ports:
       - "5000:5000"
     volumes:
-      - "/Volumes/Macintosh HD/mlops_volumes/mlflow:/artifacts"
+      - "./mlops_volumes/mlflow:/artifacts"
     networks:
       - mlops_network
     depends_on:
       mariadb:
+        condition: service_healthy
+      rustfs:
         condition: service_healthy
     environment:
       MLFLOW_TRACKING_URI: http://mlflow:5000
@@ -80,22 +86,29 @@ services:
       context: .
       dockerfile: docker/ml/Dockerfile
       args:
-        PYTHON_VERSION: "3.11"
+        PYTHON_VERSION: "3.14"
     container_name: mlops_ml
     restart: unless-stopped
     env_file:
       - ./docker/ml/.env
       - ./docker/mlflow/.env
     working_dir: /workspace
+    command: >
+      sh -c "marimo run $${ACTIVE_NOTEBOOK:-notebooks/logistic_demo.py} --host 0.0.0.0 --port 2718 --no-token"
+    ports:
+      - "2718:2718"
     volumes:
       - ".:/workspace"
-      - "/Volumes/Macintosh HD/mlops_volumes/mlflow/.cache:/workspace/.cache"
-      - "/Volumes/Macintosh HD/mlops_volumes/ml/datasets:/workspace/datasets"
-      - "/Volumes/Macintosh HD/mlops_volumes/ml/models:/workspace/models"
+      - "./mlops_volumes/mlflow:/artifacts"
+      - "./mlops_volumes/mlflow/.cache:/workspace/.cache"
+      - "./mlops_volumes/ml/datasets:/workspace/datasets"
+      - "./mlops_volumes/ml/models:/workspace/models"
     networks:
       - mlops_network
     depends_on:
       mlflow:
+        condition: service_healthy
+      rustfs:
         condition: service_healthy
     environment:
       MLFLOW_TRACKING_URI: "http://mlflow:5000"

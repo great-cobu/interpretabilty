@@ -15,3 +15,6 @@ env/
 *.swp
 *.swo
 .gen_env_check.out
+runs/
+data/
+mlops_volumes/

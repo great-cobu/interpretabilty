@@ -1,9 +1,10 @@
 % Generator script: Reads config.pl and outputs service .env files
-% Usage: swipl -q -t main -f gen_env.pl
+% Usage: swipl -q -t main -f prolog/gen_env.pl
 
 :- [config].
 
 main :-
+    validate_experiments,
     generate_all_env_files,
     write('Successfully generated all environment (.env) files.\n'),
     halt(0).
@@ -85,6 +86,24 @@ ml_env_pair('ML_PYTHON_VERSION'-Value) :-
     service_config(ml, python_version, Value).
 ml_env_pair('MLFLOW_TRACKING_URI'-Value) :-
     service_config(ml, mlflow_tracking_uri, Value).
+ml_env_pair('MARIMO_PORT'-Value) :-
+    service_config(ml, marimo_port, Value).
+ml_env_pair('ACTIVE_EXPERIMENT'-ExpId) :-
+    active_experiment_details(ExpId, _, _, _, _, _, _, _).
+ml_env_pair('ACTIVE_MODEL'-ModelId) :-
+    active_experiment_details(_, ModelId, _, _, _, _, _, _).
+ml_env_pair('ACTIVE_DATASET'-DatasetId) :-
+    active_experiment_details(_, _, DatasetId, _, _, _, _, _).
+ml_env_pair('ACTIVE_CLI'-CliCommand) :-
+    active_experiment_details(_, _, _, CliCommand, _, _, _, _).
+ml_env_pair('ACTIVE_CONFIG'-ConfigPath) :-
+    active_experiment_details(_, _, _, _, ConfigPath, _, _, _).
+ml_env_pair('ACTIVE_RUN_DIR'-RunDir) :-
+    active_experiment_details(_, _, _, _, _, RunDir, _, _).
+ml_env_pair('ACTIVE_NOTEBOOK'-NotebookPath) :-
+    active_experiment_details(_, _, _, _, _, _, NotebookPath, _).
+ml_env_pair('ACTIVE_MLFLOW_EXPERIMENT'-ExperimentName) :-
+    active_experiment_details(_, _, _, _, _, _, _, ExperimentName).
 ml_env_pair('STORAGE_MLFLOW_PATH'-Value) :-
     storage_path(mlflow, data, Value).
 ml_env_pair('STORAGE_ML_DATASETS_PATH'-Value) :-
@@ -120,7 +139,7 @@ consolidated_env_pair('STORAGE_ML_PATH'-Value) :-
 write_header(Stream) :-
     format(Stream, '# Auto-generated environment file~n', []),
     format(Stream, '# Generated from config.pl~n', []),
-    format(Stream, '# Edit config.pl and run: swipl -q -t main -f gen_env.pl~n~n', []).
+    format(Stream, '# Edit config.pl and run: swipl -q -t main -f prolog/gen_env.pl~n~n', []).
 
 write_pairs(_, []).
 write_pairs(Stream, [Key-Value | Rest]) :-

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Generate both .env files and docker-compose.yml from config.pl
+# Generate .env files, docker-compose.yml, and configs/generated/*.yaml from prolog/config.pl
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -11,4 +11,7 @@ swipl -q -t main -f prolog/gen_env.pl
 echo "==> Generating docker-compose.yml..."
 swipl -q -t main -f prolog/gen_compose.pl
 
-echo "==> Done! Infrastructure configuration up to date."
+echo "==> Generating experiment YAML configs (configs/generated/)..."
+swipl -q -t main -f prolog/gen_configs.pl
+
+echo "==> Done! Infrastructure and experiment configurations up to date."

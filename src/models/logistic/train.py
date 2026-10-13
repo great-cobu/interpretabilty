@@ -1,4 +1,4 @@
-"""Training and resume workflows for LogisticClassifier."""
+"""Training, resume, interpretability template rendering, and MLflow logging for LogisticClassifier."""
 
 from dataclasses import replace
 import json
@@ -14,6 +14,7 @@ import torch
 from models.MNIST.config import Config, load_config, prepare_run_dir
 from models.MNIST.data import MNISTDataModule
 from models.MNIST.train import environment, learning_curves, sha256, trainer_options
+from models.logistic.evaluate import load_classifier, save_class_templates_plot
 from models.logistic.model import LogisticClassifier
 
 
@@ -67,12 +68,26 @@ def train(
         enable_version_counter=False,
         auto_insert_metric_name=False,
     )
-    logger = CSVLogger(save_dir=str(output), name="logs", version="")
+    csv_logger = CSVLogger(save_dir=str(output), name="logs", version="")
+    loggers: list = [csv_logger]
+    mlflow_logger = None
+    if config.tracking.enabled and config.tracking.uri:
+        from lightning.pytorch.loggers import MLFlowLogger
+
+        mlflow_logger = MLFlowLogger(
+            experiment_name=config.tracking.experiment_name,
+            run_name=config.tracking.run_name or output.name,
+            tracking_uri=config.tracking.uri,
+            tags=dict(config.tracking.tags) if config.tracking.tags else None,
+            log_model=False,
+        )
+        loggers.append(mlflow_logger)
+
     trainer = pl.Trainer(
         **options,
         default_root_dir=str(output),
         max_epochs=config.trainer.max_epochs,
-        logger=logger,
+        logger=loggers if len(loggers) > 1 else csv_logger,
         callbacks=[
             EarlyStopping(
                 monitor="val/loss",
@@ -94,17 +109,22 @@ def train(
     started = time.perf_counter()
     trainer.fit(model, datamodule=data, ckpt_path=str(resume) if resume else None, weights_only=True)
     elapsed = time.perf_counter() - started
-    logger.save()
+    csv_logger.save()
 
     best_path = Path(checkpoint.best_model_path) if checkpoint.best_model_path else ckpt_dir / "best.ckpt"
     last_path = Path(checkpoint.last_model_path) if checkpoint.last_model_path else ckpt_dir / "last.ckpt"
     best_data = torch.load(best_path, map_location="cpu", weights_only=True)
     last_data = torch.load(last_path, map_location="cpu", weights_only=True)
 
-    (ckpt_dir / "manifest.json").write_text(
+    manifest_path = ckpt_dir / "manifest.json"
+    manifest_path.write_text(
         json.dumps({p.name: sha256(p) for p in (best_path, last_path) if p.is_file()}, indent=2) + "\n"
     )
-    learning_curves(Path(logger.log_dir) / "metrics.csv", output / "learning_curves.png")
+    curves_path = output / "learning_curves.png"
+    learning_curves(Path(csv_logger.log_dir) / "metrics.csv", curves_path)
+
+    best_model = load_classifier(best_path, device="cpu")
+    templates_path = save_class_templates_plot(best_model, output / "class_templates.png")
 
     report = {
         "model": "LogisticRegression",
@@ -115,6 +135,10 @@ def train(
         "best_val_loss": float(checkpoint.best_model_score) if checkpoint.best_model_score is not None else float(trainer.callback_metrics.get("val/loss", 0.0)),
         "best_checkpoint": str(best_path.resolve()),
         "last_checkpoint": str(last_path.resolve()),
+        "class_templates_plot": str(templates_path.resolve()),
+        "learning_curves_plot": str(curves_path.resolve()),
+        "mlflow_run_id": mlflow_logger.run_id if mlflow_logger is not None else None,
+        "mlflow_experiment_id": mlflow_logger.experiment_id if mlflow_logger is not None else None,
         "accelerator": options["accelerator"],
         "environment": environment(),
         "smoke_run": config.trainer.limit_train_batches is not None or config.trainer.limit_val_batches is not None,
@@ -124,7 +148,14 @@ def train(
         "resumed_from_epoch": int(saved_ckpt["epoch"]) + 1 if saved_ckpt else None,
         "resumed_from_global_step": int(saved_ckpt["global_step"]) if saved_ckpt else None,
     }
-    (output / "training_summary.json").write_text(json.dumps(report, indent=2) + "\n")
+    summary_path = output / "training_summary.json"
+    summary_path.write_text(json.dumps(report, indent=2) + "\n")
+
+    if mlflow_logger is not None and mlflow_logger.run_id:
+        for artifact in (output / "config.yaml", curves_path, templates_path, summary_path, manifest_path):
+            if artifact.is_file():
+                mlflow_logger.experiment.log_artifact(mlflow_logger.run_id, str(artifact), artifact_path="training")
+
     return report
 
 

@@ -1,19 +1,17 @@
-# Dockerfile for Machine Learning development
-# Python image with SWI-Prolog, uv, ML libraries, PyTorch, and HuggingFace support
+# Dockerfile for Machine Learning & Interpretability Container
+# Python 3.14 image with SWI-Prolog, uv, PyTorch, Lightning, MLflow, and Marimo
 
-ARG PYTHON_VERSION=3.11
+ARG PYTHON_VERSION=3.14
 FROM python:${PYTHON_VERSION}-slim
 
 # Install uv package manager from official image
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
-# Set environment variables for uv, Python, and HuggingFace
+# Use /opt/venv so bind-mounting .:/workspace does not shadow the container's Linux venv
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    UV_SYSTEM_PYTHON=1 \
-    HF_HOME="/workspace/.cache/huggingface" \
-    TRANSFORMERS_CACHE="/workspace/.cache/huggingface/transformers" \
-    HF_DATASETS_CACHE="/workspace/.cache/huggingface/datasets" \
+    UV_PROJECT_ENVIRONMENT="/opt/venv" \
+    PATH="/opt/venv/bin:$PATH" \
     MLFLOW_TRACKING_URI="http://mlflow:5000"
 
 # Install system dependencies including SWI-Prolog
@@ -23,36 +21,33 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     wget \
     ca-certificates \
-    swi-prolog \
+    swi-prolog-nox \
     && rm -rf /var/lib/apt/lists/*
 
-# Set working directory
 WORKDIR /workspace
 
-# Copy dependency specification first for Docker layer caching
-COPY requirements.txt /workspace/requirements.txt
+# Copy project dependency manifests first for Docker layer caching
+COPY pyproject.toml uv.lock README.md /workspace/
+COPY src /workspace/src
 
-# Install all Python dependencies from requirements.txt using uv
-RUN uv pip install --system --no-cache-dir -r /workspace/requirements.txt
+# Sync locked dependencies, MLflow extra, dev (pytest), and notebooks (marimo) into /opt/venv
+RUN uv sync --locked --extra mlflow --group dev --group notebooks
 
-# Copy the entire project directory into /workspace
+# Copy remaining project files
 COPY . /workspace
 
-# Install the project itself in editable mode
-RUN uv pip install --system --no-deps -e /workspace
-
-# Create directory structure for datasets, models, and HuggingFace cache
-RUN mkdir -p /workspace/.cache/huggingface/transformers \
-             /workspace/.cache/huggingface/datasets \
+# Ensure runtime directories exist
+RUN mkdir -p /workspace/.cache \
              /workspace/datasets \
-             /workspace/models
+             /workspace/models \
+             /workspace/data \
+             /workspace/runs \
+             /artifacts
 
-# Health check - verify key ML libraries import and SWI-Prolog runs
-HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
-    CMD python -c "import numpy, pandas, sklearn, torch, transformers, mlflow; print('OK')" && swipl --version || exit 1
+EXPOSE 2718
 
-# Volume for code mounting (optional override in compose)
-VOLUME ["/workspace"]
+# Health check - verify Marimo server and SWI-Prolog are responsive
+HEALTHCHECK --interval=10s --timeout=15s --start-period=10s --retries=5 \
+    CMD curl -sf http://localhost:${MARIMO_PORT:-2718} > /dev/null && swipl --version > /dev/null || exit 1
 
-# Default command - interactive bash shell
-CMD ["bash"]
+CMD ["sh", "-c", "marimo run ${ACTIVE_NOTEBOOK:-notebooks/logistic_demo.py} --host 0.0.0.0 --port ${MARIMO_PORT:-2718} --no-token"]

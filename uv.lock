@@ -793,15 +793,6 @@ wheels = [
 ]
 
 [[package]]
-name = "janus-swi"
-version = "1.5.3"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/f9/84/4145112cc4e07a4b1e7ec6806cba1a1ca9bf8f68ea8df693c4ff0e0d70d8/janus_swi-1.5.3.tar.gz", hash = "sha256:2ce9867bb1e0cbab7737c8e2a7af3268f2241251e5b0eb955726c829ae995f8d", size = 90117, upload-time = "2026-06-24T08:32:36.26Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/3f/6f/c9924737b5be6a7e634576a7712f4cf2af666b14edb9206093114ebf9423/janus_swi-1.5.3-cp314-cp314-win_amd64.whl", hash = "sha256:29ab9a7afb9fb523fea12c19fb01115c9b1be8e21a40bddd3629c78abdf91dbb", size = 77816, upload-time = "2026-06-24T08:53:11.893Z" },
-]
-
-[[package]]
 name = "jedi"
 version = "0.20.1"
 source = { registry = "https://pypi.org/simple" }
@@ -1159,7 +1150,6 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "cryptography" },
-    { name = "janus-swi" },
     { name = "kubernetes" },
     { name = "lightning" },
     { name = "matplotlib" },
@@ -1193,7 +1183,6 @@ notebooks = [
 [package.metadata]
 requires-dist = [
     { name = "cryptography", specifier = ">=42.0.5" },
-    { name = "janus-swi", specifier = ">=1.5.3" },
     { name = "kubernetes", specifier = ">=36.0.3" },
     { name = "lightning", specifier = ">=2.6" },
     { name = "matplotlib", specifier = ">=3.10" },

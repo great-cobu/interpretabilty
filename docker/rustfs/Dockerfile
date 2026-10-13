@@ -1,14 +1,12 @@
 # Dockerfile for RustFS
 # Lightweight high-performance file and artifact storage service
 
-FROM rust:1.77-bookworm as builder
+FROM rust:bookworm AS builder
 
-WORKDIR /build
+WORKDIR /build/rustfs
 
 # Initialize Rust project
 RUN cargo init --name rustfs
-
-WORKDIR /build/rustfs
 
 # Add dependencies to Cargo.toml
 RUN cat >> Cargo.toml << 'EOF'

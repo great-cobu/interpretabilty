@@ -78,8 +78,8 @@ class LogisticRegression(nn.Module):
         else:
             target_idx = target_class.to(device=x.device, dtype=torch.long)
 
-        templates = self.layers.logits.weight[target_idx].view(batch_size, 1, 28, 28)
-        return x * templates
+        templates = self.layers.logits.weight.detach()[target_idx.clone()].view(batch_size, 1, 28, 28)
+        return x.detach() * templates
 
 
 class LogisticClassifier(pl.LightningModule):

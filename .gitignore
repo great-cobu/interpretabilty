@@ -19,10 +19,12 @@ __pycache__/
 *.egg-info/
 /dist/
 
-# Environments, datasets, and generated runs
+# Environments, datasets, volumes, and generated runs
 /.venv/
 /data/
 /runs/
+/mlops_volumes/
+/mlruns/
 
 # Local generated environment files
 .env

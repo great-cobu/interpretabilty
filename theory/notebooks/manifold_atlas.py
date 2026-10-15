@@ -1,7 +1,11 @@
 import marimo
 
 __generated_with = "0.25.1"
-app = marimo.App(width="medium")
+app = marimo.App(
+    width="medium",
+    layout_file="layouts/manifold_atlas.slides.json",
+    css_file="theme.css",
+)
 
 
 @app.cell(hide_code=True)
@@ -29,20 +33,45 @@ def _():
         render_sphere_charts_animation,
     )
 
-    return Path, SphereAtlas, mo, np, plt, render_sphere_charts_animation
+    voyage_slider = mo.ui.slider(
+        start=0.0,
+        stop=1.0,
+        step=0.02,
+        value=0.32,
+        label=r"Ship Voyage Progress $t \in [0, 1]$",
+    )
+    route_selector = mo.ui.radio(
+        options={
+            "Geodesic (Great Circle — Shortest & Zero Rudder Turn)": "geodesic",
+            "Non-Geodesic Detour (Requires Sideways Steering)": "detour",
+        },
+        value="Geodesic (Great Circle — Shortest & Zero Rudder Turn)",
+        label="Active Ship Route",
+    )
+    return (
+        Path,
+        SphereAtlas,
+        mo,
+        np,
+        plt,
+        render_sphere_charts_animation,
+        route_selector,
+        voyage_slider,
+    )
 
 
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
     # Manifolds, Coordinate Charts, Atlases, and Geodesics on $S^2$
+    *Slide 1 of 6 — Fundamental Definitions: Manifold & Coordinate Chart*
 
-    ## 1. Fundamental Definitions: Manifold, Chart, Atlas, and Geodesic
+    ---
 
     ### Definition 1: Manifold ($M$)
     - **Natural Language**: A **manifold** is a space that may be curved or closed on a global scale—like the ocean surface covering a spherical Earth ($S^2$)—but that looks locally like flat Euclidean space ($\mathbb{R}^n$) in a small neighborhood around every point. To a sailor looking out at a small patch of calm sea, the ocean appears flat even though the Earth is round.
-    - **Mathematical Definition**: An $n$-dimensional **topological manifold** is a Hausdorff, second-countable topological space $M$ such that every point $p \in M$ has an open neighborhood $U \subset M$ homeomorphic to an open subset of $\mathbb{R}^n$. For the unit 2-sphere:
-      $$S^2 = \left\{ x = (x^1, x^2, x^3) \in \mathbb{R}^3 \;\middle|\; \|x\|^2 = (x^1)^2 + (x^2)^2 + (x^3)^2 = 1 \right\}, \qquad n = 2$$
+    - **Mathematical Definition**: An $n$-dimensional **topological manifold** is a Hausdorff, second-countable topological space $M$ such that every point $p \in M$ has an open neighborhood $U \subset M$ homeomorphic to an open subset of $\mathbb{R}^n$. For the unit 2-sphere ($n = 2$):
+      $$S^2 = \left\{ x = (x^1, x^2, x^3) \in \mathbb{R}^3 \;\middle|\; \|x\|^2 = (x^1)^2 + (x^2)^2 + (x^3)^2 = 1 \right\}$$
 
     ---
 
@@ -50,25 +79,49 @@ def _(mo):
     - **Natural Language**: A **coordinate chart** (or simply **chart**) is a single local flat map covering a small open patch $U_\alpha \subset M$ of the manifold. On an ocean voyage, we construct a chart at a waypoint $p_\alpha \in S^2$ by resting a flat **tangent plane** $T_{p_\alpha} S^2$ against the sphere at $p_\alpha$ and projecting the nearby curved ocean patch $U_\alpha$ orthogonally onto that flat plane.
     - **Mathematical Definition**: A **chart** on $M$ is a pair $(U_\alpha, \varphi_\alpha)$ where $U_\alpha \subset M$ is an open set and
       $$\varphi_\alpha : U_\alpha \xrightarrow{\;\sim\;} \varphi_\alpha(U_\alpha) \subset \mathbb{R}^n$$
-      is a homeomorphism onto an open subset of $\mathbb{R}^n$, assigning local Euclidean coordinates $(u^1, \dots, u^n) = \varphi_\alpha(x)$ to every point $x \in U_\alpha$.
+      is a homeomorphism onto an open subset of $\mathbb{R}^n$, assigning local Euclidean coordinates $(u, v) = \varphi_\alpha(x)$ to every point $x \in U_\alpha$.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    # Smooth Atlases & Diffeomorphic Navigation
+    *Slide 2 of 6 — Definition 3: Smooth Atlas ($\mathcal{A}$) and Transition Diffeomorphisms ($\tau_{\alpha\beta}$)*
 
     ---
 
-    ### Definition 3: Atlas ($\mathcal{A}$) and Diffeomorphic Transition Maps ($\tau_{\alpha\beta}$)
-    - **Natural Language**: Because a closed sphere cannot be flattened onto a single plane without tearing or severe horizon distortion, a single chart is not enough. An **atlas** is a collection of small, overlapping charts that together cover the entire manifold.
-      **Why Diffeomorphism Enables Consistent Navigation**: As a ship sails from one chart $U_\alpha$ into an overlapping chart $U_\beta$, it lies in the overlap region $U_\alpha \cap U_\beta$ and is tracked on **both** flat tangent planes at once. The **transition map** $\tau_{\alpha\beta} = \varphi_\beta \circ \varphi_\alpha^{-1}$ translates the ship's coordinates from Chart $\alpha$ to Chart $\beta$. Requiring $\tau_{\alpha\beta}$ to be a **diffeomorphism**—a bijective map that is infinitely differentiable ($C^\infty$) in both directions with an invertible Jacobian matrix $d\tau_{\alpha\beta}$—guarantees that positions, velocities, compass headings, and differential equations of motion translate uniquely and consistently from one chart to the next without jumps or kinks.
-    - **Mathematical Definition**: A **$C^\infty$ (smooth) atlas** on $M$ is a family of charts $\mathcal{A} = \{(U_\alpha, \varphi_\alpha)\}_{\alpha \in I}$ covering $M = \bigcup_{\alpha \in I} U_\alpha$ such that for every pair of overlapping charts with $U_\alpha \cap U_\beta \neq \varnothing$, the **transition map**
+    ### Definition 3: Smooth Atlas ($\mathcal{A}$)
+    - **Natural Language**: Because a closed sphere cannot be flattened onto a single plane without tearing or severe horizon distortion, a single chart is not enough. An **atlas** is a collection of small, overlapping charts $\mathcal{A} = \{(U_\alpha, \varphi_\alpha)\}_{\alpha \in I}$ whose domains together cover the entire manifold ($M = \bigcup_{\alpha \in I} U_\alpha$).
+
+    ---
+
+    ### Why Diffeomorphism Enables Consistent Navigation
+    - **Navigating Across Chart Overlaps**: As a ship sails from one chart $U_\alpha$ into an overlapping chart $U_\beta$, it passes through the overlap region $U_\alpha \cap U_\beta$ and is tracked on **both** flat tangent planes simultaneously. The **transition map** $\tau_{\alpha\beta} = \varphi_\beta \circ \varphi_\alpha^{-1}$ converts the ship's coordinates from Chart $\alpha$ to Chart $\beta$.
+    - **Mathematical Guarantee**: For a smooth manifold, every transition map on $U_\alpha \cap U_\beta \neq \varnothing$ is a **$C^\infty$ diffeomorphism**:
       $$\tau_{\alpha\beta} = \varphi_\beta \circ \varphi_\alpha^{-1} : \varphi_\alpha(U_\alpha \cap U_\beta) \xrightarrow{\;\sim\;} \varphi_\beta(U_\alpha \cap U_\beta)$$
-      is a **$C^\infty$ diffeomorphism** between open subsets of $\mathbb{R}^n$:
-      $$\tau_{\alpha\beta} \in C^\infty, \qquad \tau_{\alpha\beta}^{-1} = \tau_{\beta\alpha} \in C^\infty, \qquad \det\bigl(d\tau_{\alpha\beta}(u)\bigr) \neq 0 \quad \forall u \in \varphi_\alpha(U_\alpha \cap U_\beta)$$
+      $$\tau_{\alpha\beta} \in C^\infty, \qquad \tau_{\alpha\beta}^{-1} = \tau_{\beta\alpha} \in C^\infty, \qquad \det\bigl(d\tau_{\alpha\beta}(u, v)\bigr) \neq 0$$
+    - Because $\tau_{\alpha\beta}$ is bijective and its Jacobian matrix $d\tau_{\alpha\beta}$ is everywhere invertible, positions, velocities, compass bearings, and differential equations of motion translate uniquely and reversibly from one chart to the next without jumps or kinks.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    # Riemannian Metrics & Geodesics (Great Circles)
+    *Slide 3 of 6 — Definition 4: Riemannian Metric ($g$) and Geodesic ($\gamma$)*
 
     ---
 
     ### Definition 4: Riemannian Metric ($g$) and Geodesic ($\gamma$)
-    - **Natural Language**: A **Riemannian metric** $g$ equips each tangent plane $T_p M$ with an inner product so we can measure true curved lengths, speeds, and angles directly inside our flat charts. A **geodesic** is the generalization of a straight line to a curved manifold: it is both the **locally shortest path** between two points and the path followed by a ship that **sails with its rudder locked straight ahead** (experiencing **zero covariant/tangential acceleration** $\nabla_{\dot{\gamma}}\dot{\gamma} = 0$ along the water). On the sphere $S^2$, geodesics are **great circles**—the intersections of $S^2$ with planes through the center of the Earth.
-    - **Mathematical Definition**: A smooth curve $\gamma : [0, 1] \to (M, g)$ with chart coordinates $u(t) = \varphi_\alpha(\gamma(t))$ is a **geodesic** if its covariant acceleration vanishes:
+    - **Riemannian Metric**: A **Riemannian metric** $g$ equips each tangent plane $T_p M$ with a smoothly varying inner product $g_p : T_p M \times T_p M \to \mathbb{R}$, allowing us to measure true surface lengths, speeds, and angles inside flat chart coordinates $(u, v)$.
+    - **What Is a Geodesic?**: A **geodesic** is the generalization of a straight line to a curved manifold, characterized by two equivalent properties:
+      1. **Locally Shortest Path**: It minimizes the Riemannian arc length $L[\gamma] = \int_0^1 \sqrt{g_{ij}(u)\,\dot{u}^i \dot{u}^j}\,dt$ between nearby points.
+      2. **Zero Covariant Acceleration ($\nabla_{\dot{\gamma}}\dot{\gamma} = 0$)**: It is the path followed by a ship that **locks its rudder straight ahead and sails at constant speed without turning left or right**. Its 3D acceleration points purely along the surface normal toward the Earth's center, with zero tangential acceleration along the water.
+    - **Great Circles on $S^2$**: On the sphere $S^2$, every geodesic is an arc of a **great circle** (the intersection of $S^2$ with a plane through the origin). In local chart coordinates $(u, v)$, a geodesic satisfies the **geodesic differential equation**:
       $$\left(\nabla_{\dot{\gamma}}\dot{\gamma}\right)^k = \ddot{u}^k(t) + \Gamma^k_{ij}\bigl(u(t)\bigr)\,\dot{u}^i(t)\,\dot{u}^j(t) = 0$$
-      where $\Gamma^k_{ij}$ are the **Christoffel symbols** of the Levi-Civita connection determined by the metric tensor $g_{ij}$.
     """)
     return
 
@@ -87,12 +140,10 @@ def _(Path, mo, render_sphere_charts_animation):
         [
             mo.md(
                 r"""
-                ## 2. Animation: Overlapping Tangent-Plane Charts & Geodesic (Great Circle) Navigation
+                # 3D Animation: Overlapping Tangent Charts & Geodesic Navigation
+                *Slide 4 of 6 — Manim 3D Visualization*
 
-                The Manim 3D animation below illustrates:
-                1. Three overlapping ocean patches $U_1$ (teal), $U_2$ (yellow), and $U_3$ (orange) on the manifold $S^2$ projecting orthogonally onto their flat tangent planes $T_{p_1}S^2, T_{p_2}S^2, T_{p_3}S^2$.
-                2. The **great-circle geodesic** $\gamma_{\text{geo}}(t)$ (solid green) compared against a curved non-geodesic detour (dashed grey).
-                3. The ship (red dot) sailing along the geodesic across the chart overlaps $U_1 \cap U_2$ and $U_2 \cap U_3$, tracked simultaneously on both adjacent tangent planes via the transition diffeomorphism $\tau_{\alpha\beta}$.
+                Three overlapping ocean patches $U_1$ (teal), $U_2$ (yellow), and $U_3$ (orange) project orthogonally onto their flat tangent planes $T_{p_1}S^2, T_{p_2}S^2, T_{p_3}S^2$. The ship (red dot) sails along the **great-circle geodesic** (solid green, contrasted with the dashed grey detour) and projects simultaneously onto both adjacent tangent planes in each overlap region $U_\alpha \cap U_\beta$:
                 """
             ),
             mo.video(src=str(video_path), autoplay=True, loop=True, controls=True),
@@ -102,39 +153,7 @@ def _(Path, mo, render_sphere_charts_animation):
 
 
 @app.cell(hide_code=True)
-def _(mo):
-    voyage_slider = mo.ui.slider(
-        start=0.0,
-        stop=1.0,
-        step=0.02,
-        value=0.32,
-        label=r"Ship Voyage Progress $t \in [0, 1]$",
-    )
-    route_selector = mo.ui.radio(
-        options={
-            "Geodesic (Great Circle — Shortest & Zero Rudder Turn)": "geodesic",
-            "Non-Geodesic Detour (Requires Sideways Steering)": "detour",
-        },
-        value="Geodesic (Great Circle — Shortest & Zero Rudder Turn)",
-        label="Active Ship Route",
-    )
-    mo.vstack(
-        [
-            mo.md(
-                r"""
-                ### Interactive Atlas & Geodesic Explorer
-
-                Select the **Geodesic (Great Circle)** or **Non-Geodesic Detour** route and drag $t \in [0, 1]$ to sail the ship across the three overlapping tangent-plane charts $(U_1, \varphi_1)$, $(U_2, \varphi_2)$, and $(U_3, \varphi_3)$:
-                """
-            ),
-            mo.hstack([voyage_slider, route_selector], justify="start", gap=2.5),
-        ]
-    )
-    return route_selector, voyage_slider
-
-
-@app.cell(hide_code=True)
-def _(SphereAtlas, np, plt, route_selector, voyage_slider):
+def _(SphereAtlas, mo, np, plt, route_selector, voyage_slider):
     t_val = float(voyage_slider.value)
     route_mode = route_selector.value
     charts = SphereAtlas.default_voyage_charts(angular_radius=0.44)
@@ -156,7 +175,7 @@ def _(SphereAtlas, np, plt, route_selector, voyage_slider):
     geodesic_pts = SphereAtlas.geodesic_voyage(t_samples)
     detour_pts = SphereAtlas.voyage_curve(t_samples)
 
-    fig = plt.figure(figsize=(14, 4.1), dpi=120)
+    fig = plt.figure(figsize=(14, 3.8), dpi=120)
 
     # Panel 1: 3D Ocean Globe + Great Circle Geodesic + Detour + Tangent Planes
     ax3d = fig.add_subplot(1, 4, 1, projection="3d")
@@ -328,12 +347,7 @@ def _(SphereAtlas, np, plt, route_selector, voyage_slider):
         ax.legend(loc="upper left", fontsize=6.5)
 
     fig.tight_layout()
-    fig
-    return active_records, route_mode, ship_pt, t_val
 
-
-@app.cell(hide_code=True)
-def _(SphereAtlas, active_records, mo, np, route_mode, ship_pt, t_val):
     geo_length = SphereAtlas.geodesic_distance(
         SphereAtlas.start_point(), SphereAtlas.end_point()
     )
@@ -362,41 +376,56 @@ def _(SphereAtlas, active_records, mo, np, route_mode, ship_pt, t_val):
         _det_jac = float(np.linalg.det(_jac))
         transition_line = (
             rf"- **Overlap Transition Diffeomorphism ($U_{_idx_a} \cap U_{_idx_b}$)**: "
-            rf"$\tau_{{{_idx_a}{_idx_b}}}(\varphi_{_idx_a}(\gamma(t))) = ({_uv_b_trans[0]:+.4f},\; {_uv_b_trans[1]:+.4f}) = \varphi_{_idx_b}(\gamma(t))$"
-            "\n    "
-            rf"- **Transition Jacobian $d\tau_{{{_idx_a}{_idx_b}}}$**: "
-            rf"$\begin{{pmatrix}} {_jac[0,0]:+.4f} & {_jac[0,1]:+.4f} \\ {_jac[1,0]:+.4f} & {_jac[1,1]:+.4f} \end{{pmatrix}}$, "
-            rf"$\quad \det(d\tau_{{{_idx_a}{_idx_b}}}) = {_det_jac:+.4f} \neq 0$ *(invertible diffeomorphism)*"
+            rf"$\tau_{{{_idx_a}{_idx_b}}}(\varphi_{_idx_a}(\gamma(t))) = ({_uv_b_trans[0]:+.4f},\; {_uv_b_trans[1]:+.4f}) = \varphi_{_idx_b}(\gamma(t))$, "
+            rf"$\quad \det(d\tau_{{{_idx_a}{_idx_b}}}) = {_det_jac:+.4f} \neq 0$"
         )
     else:
-        transition_line = r"- **Single-Chart Region**: Ship is currently inside a single chart; advance $t$ into an overlap region ($t \in [0.26, 0.40]$ or $t \in [0.60, 0.74]$) to inspect the transition diffeomorphism $\tau_{\alpha\beta}$ and its Jacobian $d\tau_{\alpha\beta}$."
+        transition_line = r"- **Single-Chart Region**: Advance $t$ into an overlap ($t \in [0.26, 0.40]$ or $t \in [0.60, 0.74]$) to inspect the transition diffeomorphism $\tau_{\alpha\beta}$ and its Jacobian $d\tau_{\alpha\beta}$."
 
     readout_md = "\n    ".join(lines + [transition_line])
 
-    mo.md(rf"""
-    ## 3. Equations: Coordinate Charts, Transition Diffeomorphisms, Metric, and Geodesics
+    mo.vstack(
+        [
+            mo.md(
+                r"""
+                # Interactive Atlas & Geodesic Explorer
+                *Slide 5 of 6 — Live Chart Projections, Overlaps, and Geodesic Verification*
+                """
+            ),
+            mo.hstack([voyage_slider, route_selector], justify="start", gap=2.5),
+            fig,
+            mo.md(
+                rf"""
+                **Live Readout at $t = {t_val:.2f}$** — **Arc Length**: Geodesic $L[\gamma_{{\text{{geo}}}}] = {geo_length:.4f}\text{{ rad}}$ vs. Detour $L[\gamma_{{\text{{detour}}}}] = {detour_length:.4f}\text{{ rad}}$
+                {readout_md}
+                """
+            ),
+        ]
+    )
+    return
 
-    1. **Local Tangent-Plane Chart $(U_\alpha, \varphi_\alpha)$ and Inverse $\varphi_\alpha^{{-1}}$**:
-       At each waypoint $p_\alpha \in S^2$ with orthonormal East-North tangent basis $(e_1^{{(\alpha)}}, e_2^{{(\alpha)}})$ spanning $T_{{p_\alpha}}S^2$:
-       $$\varphi_\alpha(x) = (u, v) = \bigl(\langle x, e_1^{{(\alpha)}} \rangle,\; \langle x, e_2^{{(\alpha)}} \rangle\bigr), \qquad \varphi_\alpha^{{-1}}(u, v) = \sqrt{{1 - u^2 - v^2}}\,p_\alpha + u\,e_1^{{(\alpha)}} + v\,e_2^{{(\alpha)}}$$
 
-    2. **Transition Diffeomorphism $\tau_{{\alpha\beta}}$ and Velocity Transformation ($d\tau_{{\alpha\beta}}$)**:
-       On $U_\alpha \cap U_\beta$, coordinates and velocity vectors $(\dot{{u}}_\alpha, \dot{{v}}_\alpha)$ transform consistently via $\tau_{{\alpha\beta}} = \varphi_\beta \circ \varphi_\alpha^{{-1}}$ and its invertible Jacobian matrix $d\tau_{{\alpha\beta}}$:
-       $$\tau_{{\alpha\beta}}(u, v) = \left(\left\langle \varphi_\alpha^{{-1}}(u,v),\; e_1^{{(\beta)}} \right\rangle,\; \left\langle \varphi_\alpha^{{-1}}(u,v),\; e_2^{{(\beta)}} \right\rangle\right), \qquad \begin{{pmatrix}} \dot{{u}}_\beta \\ \dot{{v}}_\beta \end{{pmatrix}} = d\tau_{{\alpha\beta}}(u_\alpha, v_\alpha) \begin{{pmatrix}} \dot{{u}}_\alpha \\ \dot{{v}}_\alpha \end{{pmatrix}}$$
-
-    3. **Pullback Riemannian Metric $g_{{ij}}(u, v)$ and Christoffel Symbols $\Gamma^k_{{ij}}(u, v)$**:
-       $$g_{{ij}}(u, v) = \delta_{{ij}} + \frac{{u_i u_j}}{{1 - u^2 - v^2}}, \qquad \Gamma^k_{{ij}}(u, v) = u^k\,g_{{ij}}(u, v)$$
-
-    4. **Geodesic Equation & Great-Circle Parameterization on $S^2$**:
-       $$\left(\nabla_{{\dot{{\gamma}}}}\dot{{\gamma}}\right)^k = \ddot{{u}}^k + \Gamma^k_{{ij}}(u, v)\,\dot{{u}}^i \dot{{u}}^j = 0 \quad \Longleftrightarrow \quad \gamma_{{\text{{geo}}}}(t) = \frac{{\sin\bigl((1 - t)\Omega\bigr)}}{{\sin\Omega}}\,p_0 + \frac{{\sin(t\Omega)}}{{\sin\Omega}}\,p_1, \quad \Omega = \arccos(\langle p_0, p_1 \rangle)$$
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    # Governing Equations: Charts, Transitions, Metric, and Geodesics
+    *Slide 6 of 6 — Complete Symbolic Summary*
 
     ---
 
-    ### Live Numerical Readout at Voyage Time $t = {t_val:.2f}$ ({'Geodesic Great Circle' if route_mode == 'geodesic' else 'Non-Geodesic Detour'})
+    1. **Local Tangent-Plane Chart $(U_\alpha, \varphi_\alpha)$ and Inverse $\varphi_\alpha^{-1}$**:
+       At each waypoint $p_\alpha \in S^2$ with orthonormal East-North tangent basis $(e_1^{(\alpha)}, e_2^{(\alpha)})$ spanning $T_{p_\alpha}S^2$:
+       $$\varphi_\alpha(x) = (u, v) = \bigl(\langle x, e_1^{(\alpha)} \rangle,\; \langle x, e_2^{(\alpha)} \rangle\bigr), \qquad \varphi_\alpha^{-1}(u, v) = \sqrt{1 - u^2 - v^2}\,p_\alpha + u\,e_1^{(\alpha)} + v\,e_2^{(\alpha)}$$
 
-    - **Total Route Arc Length Comparison**: Geodesic Great Circle $L[\gamma_{{\text{{geo}}}}] = {geo_length:.4f}\text{{ rad}}$ vs. Detour Route $L[\gamma_{{\text{{detour}}}}] = {detour_length:.4f}\text{{ rad}}$ *(Geodesic saves {((detour_length - geo_length) / geo_length) * 100:.2f}% distance)*
-    - **Ship Position on Ocean**: $\gamma(t) = ({ship_pt[0]:+.4f},\; {ship_pt[1]:+.4f},\; {ship_pt[2]:+.4f}) \in S^2$
-    {readout_md}
+    2. **Transition Diffeomorphism $\tau_{\alpha\beta}$ and Velocity Transformation ($d\tau_{\alpha\beta}$)**:
+       On $U_\alpha \cap U_\beta$, coordinates and velocity vectors $(\dot{u}_\alpha, \dot{v}_\alpha)$ transform consistently via $\tau_{\alpha\beta} = \varphi_\beta \circ \varphi_\alpha^{-1}$ and its invertible Jacobian matrix $d\tau_{\alpha\beta}$:
+       $$\tau_{\alpha\beta}(u, v) = \left(\left\langle \varphi_\alpha^{-1}(u,v),\; e_1^{(\beta)} \right\rangle,\; \left\langle \varphi_\alpha^{-1}(u,v),\; e_2^{(\beta)} \right\rangle\right), \qquad \begin{pmatrix} \dot{u}_\beta \\ \dot{v}_\beta \end{pmatrix} = d\tau_{\alpha\beta}(u_\alpha, v_\alpha) \begin{pmatrix} \dot{u}_\alpha \\ \dot{v}_\alpha \end{pmatrix}$$
+
+    3. **Pullback Riemannian Metric $g_{ij}(u, v)$ and Christoffel Symbols $\Gamma^k_{ij}(u, v)$**:
+       $$g_{ij}(u, v) = \delta_{ij} + \frac{u_i u_j}{1 - u^2 - v^2}, \qquad \Gamma^k_{ij}(u, v) = u^k\,g_{ij}(u, v)$$
+
+    4. **Geodesic Equation & Great-Circle Parameterization on $S^2$**:
+       $$\left(\nabla_{\dot{\gamma}}\dot{\gamma}\right)^k = \ddot{u}^k + \Gamma^k_{ij}(u, v)\,\dot{u}^i \dot{u}^j = 0 \quad \Longleftrightarrow \quad \gamma_{\text{geo}}(t) = \frac{\sin\bigl((1 - t)\Omega\bigr)}{\sin\Omega}\,p_0 + \frac{\sin(t\Omega)}{\sin\Omega}\,p_1, \quad \Omega = \arccos(\langle p_0, p_1 \rangle)$$
     """)
     return
 

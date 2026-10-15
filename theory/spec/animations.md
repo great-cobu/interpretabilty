@@ -42,6 +42,7 @@ Each geometric topic lives in its corresponding subpackage under `src/riemannian
 
 ### 3.3 Interactive Notebook Presentation (`marimo`)
 - **Code Hidden by Default (`@app.cell(hide_code=True)`)**: All cells in Marimo notebooks (`notebooks/<topic>.py`) must default to having their Python code hidden (`hide_code=True`). When opened in `marimo edit`, the user sees a clean presentation of natural language, animations, interactive controls, and equations without visual code clutter, while retaining the ability to reveal and inspect or edit any cell's code whenever they wish.
+- **Left-Handed Navigation Bar (`css_file="theme.css"`)**: All Marimo notebooks in `notebooks/` must include `css_file="theme.css"`, which repositions the floating outline / table-of-contents navigation bar from the right side of the viewport to the left side.
 
 ---
 

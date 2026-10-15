@@ -1,0 +1,29 @@
+/* Left-handed navigation and outline bar positioning for Marimo notebooks. */
+
+/* Move the floating outline / table-of-contents navigation bar from the right side to the left side */
+div.fixed.top-\[25vh\].right-8 {
+  right: auto !important;
+  left: 4.25rem !important;
+}
+
+/* Align the outline indicator tick-marks to the left edge instead of the right edge */
+div.fixed.top-\[25vh\].right-8 > div.items-end {
+  align-items: flex-start !important;
+}
+
+/* When closed, keep the outline flyout panel hidden off-screen to the left */
+div.fixed.top-\[25vh\].right-8 > div.left-\[300px\].opacity-0 {
+  left: -340px !important;
+  pointer-events: none !important;
+}
+
+/* When hovered/open on the left side, expand the outline panel inward to the right */
+div.fixed.top-\[25vh\].right-8 > div.left-\[-280px\].opacity-100 {
+  left: 0px !important;
+}
+
+/* In Slides mode, place the Fullscreen control on the bottom-left instead of bottom-right */
+marimo-slides div.absolute.bottom-0.right-0 {
+  right: auto !important;
+  left: 0 !important;
+}

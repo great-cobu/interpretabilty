@@ -43,6 +43,7 @@ generate_experiment_yaml(GenDir, ExpId, ModelId, DatasetId, RunName, Params) :-
     dataset_spec(DatasetId, DataRoot, _, _, _, _),
     service_config(ml, mlflow_tracking_uri, TrackingURI),
     model_dropout(ModelId, Dropout),
+    param_or_default(activation, Params, relu, Activation),
     param_or_default(epochs, Params, 1, Epochs),
     param_or_default(batch_size, Params, 256, BatchSize),
     param_or_default(learning_rate, Params, 0.001, LR),
@@ -63,6 +64,10 @@ generate_experiment_yaml(GenDir, ExpId, ModelId, DatasetId, RunName, Params) :-
     format(Stream, "  split_indices: null~n", []),
     format(Stream, "model:~n", []),
     format(Stream, "  dropout: ~w~n", [Dropout]),
+    (   ModelId == mnist_cnn
+    ->  format(Stream, "  activation: ~w~n", [Activation])
+    ;   true
+    ),
     format(Stream, "optimizer:~n", []),
     format(Stream, "  learning_rate: ~w~n", [LR]),
     format(Stream, "  weight_decay: ~w~n", [WeightDecay]),
@@ -84,6 +89,10 @@ generate_experiment_yaml(GenDir, ExpId, ModelId, DatasetId, RunName, Params) :-
     format(Stream, "  tags:~n", []),
     format(Stream, "    model: ~w~n", [ModelId]),
     format(Stream, "    dataset: ~w~n", [DatasetId]),
+    (   ModelId == mnist_cnn
+    ->  format(Stream, "    activation: ~w~n", [Activation])
+    ;   true
+    ),
     format(Stream, "    managed_by: swi-prolog~n", []),
     format(Stream, "output_dir: ~w~n", [RunDir]),
     close(Stream).

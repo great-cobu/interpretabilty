@@ -125,17 +125,24 @@ experiment_spec(
     mnist_cnn,
     mnist,
     'mnist-cnn-container-demo',
-    [epochs(5), batch_size(64), learning_rate(0.001)]
+    [epochs(5), batch_size(64), learning_rate(0.001), activation(relu)]
 ).
 
 % Active experiment driving the container environment and test pipeline
 active_experiment(mnist_cnn_container).
 
+% Allowed activation functions for neural network models (relu, softplus, smu / 'SMU')
+valid_activation(relu).
+valid_activation(softplus).
+valid_activation(smu).
+valid_activation('SMU').
+
 % Model-specific parameter validation rules
 valid_model_params(logistic, Params) :-
     member(weight_decay(WD), Params),
     WD >= 0,
-    \+ member(epochs(_), Params).
+    \+ member(epochs(_), Params),
+    \+ member(activation(_), Params).
 
 valid_model_params(mnist_cnn, Params) :-
     member(epochs(Epochs), Params),
@@ -143,7 +150,10 @@ valid_model_params(mnist_cnn, Params) :-
     member(batch_size(BatchSize), Params),
     BatchSize > 0,
     member(learning_rate(LR), Params),
-    LR > 0.
+    LR > 0,
+    member(activation(Act), Params),
+    nonvar(Act),
+    valid_activation(Act).
 
 % Resolved details for an experiment
 experiment_config_path(ExpId, ConfigPath) :-
@@ -161,8 +171,35 @@ active_experiment_details(ExpId, ModelId, DatasetId, CliCommand, ConfigPath, Run
     experiment_config_path(ExpId, ConfigPath),
     experiment_run_dir(ExpId, RunDir).
 
-% Validate all registered experiments and the active experiment
+% ---------------------------------------------------------------------------
+% Port Conflict Policy (avoids macOS ControlCenter on 5000 & Calibre on 8080)
+% ---------------------------------------------------------------------------
+reserved_host_port(5000, 'macOS ControlCenter / AirPlay Receiver').
+reserved_host_port(8080, 'Calibre Server').
+
+service_host_port(mariadb, Port) :- service_config(mariadb, port, Port).
+service_host_port(mlflow, Port)  :- service_config(mlflow, port, Port).
+service_host_port(rustfs, Port)  :- service_config(rustfs, port, Port).
+service_host_port(ml, Port)      :- service_config(ml, marimo_port, Port).
+
+validate_ports :-
+    forall(
+        service_host_port(Service, Port),
+        (   integer(Port),
+            Port > 0,
+            \+ reserved_host_port(Port, _)
+        ->  true
+        ;   reserved_host_port(Port, Reason)
+        ->  format(user_error, 'Port conflict for ~w: port ~w is reserved (~w)~n', [Service, Port, Reason]),
+            fail
+        ;   format(user_error, 'Invalid port for ~w: ~w~n', [Service, Port]),
+            fail
+        )
+    ).
+
+% Validate all registered experiments, active experiment, and service port policies
 validate_experiments :-
+    validate_ports,
     active_experiment(ActiveExp),
     experiment_spec(ActiveExp, _, _, _, _),
     forall(

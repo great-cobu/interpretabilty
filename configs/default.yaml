@@ -10,6 +10,7 @@ data:
   split_indices: null
 model:
   dropout: 0.2
+  activation: relu
 optimizer:
   learning_rate: 0.001
   weight_decay: 0.0

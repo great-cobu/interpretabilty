@@ -27,7 +27,7 @@ use std::path::Path;
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     let bind_addr = std::env::var("RUSTFS_LISTEN_ADDR")
-        .unwrap_or_else(|_| "0.0.0.0:8080".to_string());
+        .unwrap_or_else(|_| "0.0.0.0:8088".to_string());
     
     let data_dir = std::env::var("RUSTFS_DATA_DIR")
         .unwrap_or_else(|_| "/data".to_string());
@@ -89,15 +89,15 @@ RUN mkdir -p /data
 
 WORKDIR /data
 
-# Expose port
-EXPOSE 8080
+# Expose port (8088 avoids Calibre on 8080)
+EXPOSE 8088
 
 # Environment variables
-ENV RUSTFS_LISTEN_ADDR=0.0.0.0:8080 \
+ENV RUSTFS_LISTEN_ADDR=0.0.0.0:8088 \
     RUSTFS_DATA_DIR=/data
 
 # Health check
 HEALTHCHECK --interval=10s --timeout=3s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:${RUSTFS_PORT:-8080}/health || exit 1
+    CMD curl -f http://localhost:${RUSTFS_PORT:-8088}/health || exit 1
 
 ENTRYPOINT ["rustfs"]

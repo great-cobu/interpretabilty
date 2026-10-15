@@ -26,9 +26,13 @@ class DataConfig:
     split_indices: str | None = None
 
 
+VALID_ACTIVATIONS = ("relu", "softplus", "smu", "SMU")
+
+
 @dataclass(frozen=True)
 class ModelConfig:
     dropout: float = 0.2
+    activation: str = "relu"
 
 
 @dataclass(frozen=True)
@@ -95,6 +99,8 @@ def validate(c: Config) -> None:
         raise ConfigError("Normalization requires positive std and mean in [0, 1]")
     if not (isinstance(c.model.dropout, (int, float)) and math.isfinite(c.model.dropout) and 0 <= c.model.dropout < 1):
         raise ConfigError("model.dropout must be in [0, 1)")
+    if not isinstance(c.model.activation, str) or c.model.activation not in VALID_ACTIVATIONS:
+        raise ConfigError("model.activation must be relu, softplus, or SMU")
     if c.optimizer.learning_rate <= 0 or c.optimizer.weight_decay < 0:
         raise ConfigError("Optimizer requires positive learning_rate and nonnegative weight_decay")
     if c.trainer.accelerator not in {"auto", "cpu", "cuda", "mps"}:

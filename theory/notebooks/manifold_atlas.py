@@ -1,11 +1,7 @@
 import marimo
 
 __generated_with = "0.25.1"
-app = marimo.App(
-    width="medium",
-    layout_file="layouts/manifold_atlas.slides.json",
-    css_file="theme.css",
-)
+app = marimo.App(width="medium", css_file="theme.css")
 
 
 @app.cell(hide_code=True)
@@ -33,31 +29,7 @@ def _():
         render_sphere_charts_animation,
     )
 
-    voyage_slider = mo.ui.slider(
-        start=0.0,
-        stop=1.0,
-        step=0.02,
-        value=0.32,
-        label=r"Ship Voyage Progress $t \in [0, 1]$",
-    )
-    route_selector = mo.ui.radio(
-        options={
-            "Geodesic (Great Circle — Shortest & Zero Rudder Turn)": "geodesic",
-            "Non-Geodesic Detour (Requires Sideways Steering)": "detour",
-        },
-        value="Geodesic (Great Circle — Shortest & Zero Rudder Turn)",
-        label="Active Ship Route",
-    )
-    return (
-        Path,
-        SphereAtlas,
-        mo,
-        np,
-        plt,
-        render_sphere_charts_animation,
-        route_selector,
-        voyage_slider,
-    )
+    return Path, SphereAtlas, mo, np, plt, render_sphere_charts_animation
 
 
 @app.cell(hide_code=True)
@@ -153,16 +125,48 @@ def _(Path, mo, render_sphere_charts_animation):
 
 
 @app.cell(hide_code=True)
+def _(mo):
+    voyage_slider = mo.ui.slider(
+        start=0.0,
+        stop=1.0,
+        step=0.02,
+        value=0.46,
+        label=r"Ship Voyage Progress $t \in [0, 1]$",
+    )
+    route_selector = mo.ui.radio(
+        options={
+            "Geodesic (Great Circle — Shortest & Zero Rudder Turn)": "geodesic",
+            "Non-Geodesic Detour (Requires Sideways Steering)": "detour",
+        },
+        value="Geodesic (Great Circle — Shortest & Zero Rudder Turn)",
+        label="Active Ship Route",
+    )
+    mo.vstack(
+        [
+            mo.md(
+                r"""
+                # Interactive Atlas & Geodesic Explorer
+                *Slide 5 of 6 — Live Chart Projections, Overlaps, and Geodesic Verification*
+
+                Toggle between **Geodesic (Great Circle)** and **Non-Geodesic Detour**, and drag $t \in [0, 1]$ to compare the ship's position, velocity vector $\dot{u}$ (blue arrow), and sideways steering / covariant acceleration vector $\nabla_{\dot{\gamma}}\dot{\gamma}$ (red arrow, non-zero only on the detour!):
+                """
+            ),
+            mo.hstack([voyage_slider, route_selector], justify="start", gap=2.5),
+        ]
+    )
+    return route_selector, voyage_slider
+
+
+@app.cell(hide_code=True)
 def _(SphereAtlas, mo, np, plt, route_selector, voyage_slider):
     t_val = float(voyage_slider.value)
     route_mode = route_selector.value
+    is_geodesic = route_mode == "geodesic"
     charts = SphereAtlas.default_voyage_charts(angular_radius=0.44)
     colors = ["teal", "goldenrod", "darkorange"]
 
     active_curve_fn = (
-        SphereAtlas.geodesic_voyage
-        if route_mode == "geodesic"
-        else SphereAtlas.voyage_curve
+        SphereAtlas.geodesic_voyage if is_geodesic else SphereAtlas.voyage_curve
     )
     ship_pt = active_curve_fn(t_val)
 
@@ -175,7 +179,18 @@ def _(SphereAtlas, mo, np, plt, route_selector, voyage_slider):
     geodesic_pts = SphereAtlas.geodesic_voyage(t_samples)
     detour_pts = SphereAtlas.voyage_curve(t_samples)
 
-    fig = plt.figure(figsize=(14, 3.8), dpi=120)
+    fig = plt.figure(figsize=(14, 4.1), dpi=120)
+    route_title = (
+        "ACTIVE: Geodesic (Great Circle) — Zero Sideways Acceleration (∇_γ̇ γ̇ = 0)"
+        if is_geodesic
+        else "ACTIVE: Non-Geodesic Detour — Sideways Rudder Acceleration (∇_γ̇ γ̇ ≠ 0, Red Arrow)"
+    )
+    fig.suptitle(
+        route_title,
+        fontsize=11,
+        fontweight="bold",
+        color="forestgreen" if is_geodesic else "crimson",
+    )
 
     # Panel 1: 3D Ocean Globe + Great Circle Geodesic + Detour + Tangent Planes
     ax3d = fig.add_subplot(1, 4, 1, projection="3d")
@@ -195,20 +210,30 @@ def _(SphereAtlas, mo, np, plt, route_selector, voyage_slider):
         detour_pts[:, 0],
         detour_pts[:, 1],
         detour_pts[:, 2],
-        "--",
-        color="dimgray",
-        lw=1.5,
+        "-" if not is_geodesic else "--",
+        color="crimson" if not is_geodesic else "dimgray",
+        lw=2.8 if not is_geodesic else 1.3,
+        alpha=1.0 if not is_geodesic else 0.45,
         label="Detour γ_detour",
     )
     ax3d.plot(
         geodesic_pts[:, 0],
         geodesic_pts[:, 1],
         geodesic_pts[:, 2],
+        "-" if is_geodesic else "--",
         color="forestgreen",
-        lw=2.4,
+        lw=2.8 if is_geodesic else 1.4,
+        alpha=1.0 if is_geodesic else 0.45,
         label="Geodesic (Great Circle)",
     )
-    ax3d.scatter(*ship_pt, color="crimson", s=60, zorder=10, label="Ship γ(t)")
+    ax3d.scatter(
+        *ship_pt,
+        color="forestgreen" if is_geodesic else "crimson",
+        edgecolors="black",
+        s=75,
+        zorder=10,
+        label="Ship γ(t)",
+    )
 
     ang_circle = np.linspace(0.0, 2.0 * np.pi, 60)
     active_records = []
@@ -247,7 +272,9 @@ def _(SphereAtlas, mo, np, plt, route_selector, voyage_slider):
         d2uv_dt2 = (uv_plus - 2.0 * uv_mid + uv_minus) / ((0.5 * dt_span) ** 2)
         cov_acc = chart.covariant_acceleration(uv_ship, duv_dt, d2uv_dt2)
 
-        active_records.append((idx, chart, col, in_chart, uv_ship, g_ship, cov_acc))
+        active_records.append(
+            (idx, chart, col, in_chart, uv_ship, g_ship, duv_dt, cov_acc)
+        )
 
         if in_chart:
             plane_pt = (
@@ -270,7 +297,7 @@ def _(SphereAtlas, mo, np, plt, route_selector, voyage_slider):
     ax3d.legend(loc="upper left", fontsize=6.5)
 
     # Panels 2, 3, 4: Flat 2D Tangent-Plane Nautical Charts phi_1(U_1), phi_2(U_2), phi_3(U_3)
-    for idx, chart, col, in_chart, uv_ship, _, _ in active_records:
+    for idx, chart, col, in_chart, uv_ship, _, duv_dt, cov_acc in active_records:
         ax = fig.add_subplot(1, 4, idx + 1)
         lim = chart.euclidean_radius
 
@@ -293,8 +320,10 @@ def _(SphereAtlas, mo, np, plt, route_selector, voyage_slider):
             ax.plot(
                 uv_geo[:, 0],
                 uv_geo[:, 1],
+                "-" if is_geodesic else "--",
                 color="forestgreen",
-                lw=2.2,
+                lw=2.8 if is_geodesic else 1.4,
+                alpha=1.0 if is_geodesic else 0.45,
                 label="Geodesic",
             )
 
@@ -304,9 +333,10 @@ def _(SphereAtlas, mo, np, plt, route_selector, voyage_slider):
             ax.plot(
                 uv_det[:, 0],
                 uv_det[:, 1],
-                "--",
-                color="dimgray",
-                lw=1.5,
+                "-" if not is_geodesic else "--",
+                color="crimson" if not is_geodesic else "dimgray",
+                lw=2.8 if not is_geodesic else 1.4,
+                alpha=1.0 if not is_geodesic else 0.45,
                 label="Detour",
             )
 
@@ -329,11 +359,44 @@ def _(SphereAtlas, mo, np, plt, route_selector, voyage_slider):
             ax.scatter(
                 uv_ship[0],
                 uv_ship[1],
-                color="crimson",
-                s=65,
-                zorder=6,
+                color="forestgreen" if is_geodesic else "crimson",
+                edgecolors="black",
+                s=75,
+                zorder=7,
                 label=rf"$\varphi_{idx}(\gamma(t))$",
             )
+            # Velocity vector arrow (blue)
+            vel_scale = 0.14
+            ax.quiver(
+                uv_ship[0],
+                uv_ship[1],
+                vel_scale * duv_dt[0],
+                vel_scale * duv_dt[1],
+                angles="xy",
+                scale_units="xy",
+                scale=1.0,
+                color="royalblue",
+                width=0.014,
+                zorder=8,
+                label=r"Velocity $\dot{u}$",
+            )
+            # Covariant acceleration / steering arrow (red, visible on detour)
+            acc_norm = float(np.linalg.norm(cov_acc))
+            if acc_norm > 1e-3:
+                acc_scale = 0.09
+                ax.quiver(
+                    uv_ship[0],
+                    uv_ship[1],
+                    acc_scale * cov_acc[0],
+                    acc_scale * cov_acc[1],
+                    angles="xy",
+                    scale_units="xy",
+                    scale=1.0,
+                    color="crimson",
+                    width=0.016,
+                    zorder=9,
+                    label=r"Steering $\nabla_{\dot{\gamma}}\dot{\gamma}$",
+                )
 
         ax.axhline(0, color="grey", lw=0.6, alpha=0.5)
         ax.axvline(0, color="grey", lw=0.6, alpha=0.5)
@@ -344,9 +407,9 @@ def _(SphereAtlas, mo, np, plt, route_selector, voyage_slider):
         ax.set_title(rf"Chart {idx}: $T_{{p_{idx}}}S^2$ ({status})")
         ax.set_xlabel(rf"$u_{idx}$")
         ax.set_ylabel(rf"$v_{idx}$")
-        ax.legend(loc="upper left", fontsize=6.5)
+        ax.legend(loc="upper left", fontsize=6.0)
 
-    fig.tight_layout()
+    fig.tight_layout(rect=[0, 0, 1, 0.93])
 
     geo_length = SphereAtlas.geodesic_distance(
         SphereAtlas.start_point(), SphereAtlas.end_point()
@@ -355,13 +418,13 @@ def _(SphereAtlas, mo, np, plt, route_selector, voyage_slider):
 
     lines = []
     active_list = [rec for rec in active_records if rec[3]]
-    for _idx, _chart, _, _in_chart, _uv_ship, _g_ship, _cov_acc in active_records:
+    for _idx, _chart, _, _in_chart, _uv_ship, _g_ship, _duv_dt, _cov_acc in active_records:
         if _in_chart:
             _cov_norm = float(np.sqrt(_cov_acc @ _g_ship @ _cov_acc))
             lines.append(
                 rf"- **Chart $U_{_idx}$ (Active)**: $\varphi_{_idx}(\gamma(t)) = ({_uv_ship[0]:+.4f},\; {_uv_ship[1]:+.4f})$, "
                 rf"$\quad \|\nabla_{{\dot{{\gamma}}}}\dot{{\gamma}}\|_g = {_cov_norm:.4f}$ "
-                rf"*(covariant acceleration: {'0 on geodesic' if route_mode == 'geodesic' else 'non-zero steering on detour'})*"
+                rf"*(covariant acceleration: {'0 on geodesic — no rudder turn' if is_geodesic else 'non-zero sideways rudder steering on detour'})*"
             )
         else:
             lines.append(
@@ -386,17 +449,10 @@ def _(SphereAtlas, mo, np, plt, route_selector, voyage_slider):
 
     mo.vstack(
         [
-            mo.md(
-                r"""
-                # Interactive Atlas & Geodesic Explorer
-                *Slide 5 of 6 — Live Chart Projections, Overlaps, and Geodesic Verification*
-                """
-            ),
-            mo.hstack([voyage_slider, route_selector], justify="start", gap=2.5),
             fig,
             mo.md(
                 rf"""
-                **Live Readout at $t = {t_val:.2f}$** — **Arc Length**: Geodesic $L[\gamma_{{\text{{geo}}}}] = {geo_length:.4f}\text{{ rad}}$ vs. Detour $L[\gamma_{{\text{{detour}}}}] = {detour_length:.4f}\text{{ rad}}$
+                **Live Readout at $t = {t_val:.2f}$ ({'Geodesic Great Circle' if is_geodesic else 'Non-Geodesic Detour'})** — **Total Arc Length**: Geodesic $L[\gamma_{{\text{{geo}}}}] = {geo_length:.4f}\text{{ rad}}$ vs. Detour $L[\gamma_{{\text{{detour}}}}] = {detour_length:.4f}\text{{ rad}}$ *(Geodesic saves {((detour_length - geo_length) / geo_length) * 100:.2f}%)*
                 {readout_md}
                 """
             ),

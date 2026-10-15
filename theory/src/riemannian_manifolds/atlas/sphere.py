@@ -242,7 +242,7 @@ class SphereAtlas:
     def voyage_curve(cls, t: NDArray[np.float64] | float) -> NDArray[np.float64]:
         """Non-geodesic curved detour trajectory gamma_{detour}(t) sharing the same endpoints."""
         t_arr = np.asarray(t, dtype=np.float64)
-        theta = cls.START_THETA + (cls.END_THETA - cls.START_THETA) * t_arr + 0.14 * np.sin(np.pi * t_arr)
+        theta = cls.START_THETA + (cls.END_THETA - cls.START_THETA) * t_arr + 0.22 * np.sin(np.pi * t_arr)
         phi = cls.START_PHI + (cls.END_PHI - cls.START_PHI) * t_arr
         return cls.spherical_to_cartesian(theta, phi)
 

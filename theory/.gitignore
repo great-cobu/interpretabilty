@@ -1,0 +1,14 @@
+# Virtual environment & caches
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+__marimo__/
+dist/
+*.egg-info/
+
+# Manim intermediate build artifacts (keep final rendered .mp4)
+media/Tex/
+media/texts/
+media/images/
+media/videos/**/partial_movie_files/

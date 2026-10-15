@@ -1,10 +1,16 @@
-"""Unit tests for local tangent-plane charts, overlapping atlas, and geodesics on S^2."""
+"""Unit tests for local tangent-plane charts, overlapping atlas, geodesics, and PyTorch autodiff on S^2."""
 
 from __future__ import annotations
 
 import numpy as np
+import torch
 
-from riemannian_manifolds.atlas import SphereAtlas, TangentChart
+from riemannian_manifolds.atlas import (
+    SphereAtlas,
+    TangentChart,
+    christoffel_symbols_autodiff,
+    pullback_metric_autodiff,
+)
 
 
 def test_tangent_frame_is_orthonormal() -> None:
@@ -87,9 +93,8 @@ def test_geodesic_minimizes_length_and_has_zero_covariant_acceleration() -> None
     np.testing.assert_allclose(geo_arc_len, geo_dist, atol=1e-6)
     assert detour_arc_len > geo_arc_len + 1e-2, "Geodesic (great circle) must be strictly shorter than detour"
 
-    # Check zero covariant acceleration nabla_{dot{gamma}} dot{gamma} = 0 on geodesic vs non-zero on detour
     charts = SphereAtlas.default_voyage_charts()
-    chart = charts[1]  # Middle chart centered at t = 0.50
+    chart = charts[1]
     t0 = 0.46
     eps = 1e-4
 
@@ -108,3 +113,24 @@ def test_geodesic_minimizes_length_and_has_zero_covariant_acceleration() -> None
     a_det = (uv_det_p - 2.0 * uv_det_0 + uv_det_m) / (eps**2)
     cov_acc_det = chart.covariant_acceleration(uv_det_0, v_det, a_det)
     assert np.linalg.norm(cov_acc_det) > 0.5, "Non-geodesic detour must have non-zero covariant acceleration"
+
+
+def test_autodiff_metric_and_christoffel_match_analytical() -> None:
+    chart = TangentChart(theta_0=0.95, phi_0=0.4, angular_radius=0.45)
+    p_t = torch.tensor(chart.center, dtype=torch.float64)
+    e1_t = torch.tensor(chart.e1, dtype=torch.float64)
+    e2_t = torch.tensor(chart.e2, dtype=torch.float64)
+
+    def phi_inv_torch(uv_t: torch.Tensor) -> torch.Tensor:
+        u, v = uv_t[0], uv_t[1]
+        z = torch.sqrt(1.0 - u**2 - v**2)
+        return z * p_t + u * e1_t + v * e2_t
+
+    uv_np = np.array([0.16, -0.11], dtype=np.float64)
+    uv_torch = torch.tensor(uv_np, dtype=torch.float64)
+
+    g_auto = pullback_metric_autodiff(phi_inv_torch, uv_torch).numpy()
+    gamma_auto = christoffel_symbols_autodiff(phi_inv_torch, uv_torch).numpy()
+
+    np.testing.assert_allclose(g_auto, chart.metric_tensor(uv_np), atol=1e-13)
+    np.testing.assert_allclose(gamma_auto, chart.christoffel_symbols(uv_np), atol=1e-13)

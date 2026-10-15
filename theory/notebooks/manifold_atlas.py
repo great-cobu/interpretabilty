@@ -17,26 +17,41 @@ def _():
     import marimo as mo
     import matplotlib.pyplot as plt
     import numpy as np
+    import torch
 
+    import riemannian_manifolds.atlas.autodiff as _autodiff_mod
     import riemannian_manifolds.atlas.sphere as _sphere_mod
     import riemannian_manifolds.atlas as _atlas_mod
 
+    importlib.reload(_autodiff_mod)
     importlib.reload(_sphere_mod)
     importlib.reload(_atlas_mod)
 
     from riemannian_manifolds.atlas import (
         SphereAtlas,
+        christoffel_symbols_autodiff,
+        pullback_metric_autodiff,
         render_sphere_charts_animation,
     )
 
-    return Path, SphereAtlas, mo, np, plt, render_sphere_charts_animation
+    return (
+        Path,
+        SphereAtlas,
+        christoffel_symbols_autodiff,
+        mo,
+        np,
+        plt,
+        pullback_metric_autodiff,
+        render_sphere_charts_animation,
+        torch,
+    )
 
 
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
     # Manifolds, Coordinate Charts, Atlases, and Geodesics on $S^2$
-    *Slide 1 of 6 — Fundamental Definitions: Manifold & Coordinate Chart*
+    *Slide 1 of 7 — Fundamental Definitions: Manifold & Coordinate Chart*
 
     ---
 
@@ -60,7 +75,7 @@ def _(mo):
 def _(mo):
     mo.md(r"""
     # Smooth Atlases & Diffeomorphic Navigation
-    *Slide 2 of 6 — Definition 3: Smooth Atlas ($\mathcal{A}$) and Transition Diffeomorphisms ($\tau_{\alpha\beta}$)*
+    *Slide 2 of 7 — Definition 3: Smooth Atlas ($\mathcal{A}$) and Transition Diffeomorphisms ($\tau_{\alpha\beta}$)*
 
     ---
 
@@ -83,7 +98,7 @@ def _(mo):
 def _(mo):
     mo.md(r"""
     # Riemannian Metrics & Geodesics (Great Circles)
-    *Slide 3 of 6 — Definition 4: Riemannian Metric ($g$) and Geodesic ($\gamma$)*
+    *Slide 3 of 7 — Definition 4: Riemannian Metric ($g$) and Geodesic ($\gamma$)*
 
     ---
 
@@ -113,7 +128,7 @@ def _(Path, mo, render_sphere_charts_animation):
             mo.md(
                 r"""
                 # 3D Animation: Overlapping Tangent Charts & Geodesic Navigation
-                *Slide 4 of 6 — Manim 3D Visualization*
+                *Slide 4 of 7 — Manim 3D Visualization*
 
                 Three overlapping ocean patches $U_1$ (teal), $U_2$ (yellow), and $U_3$ (orange) project orthogonally onto their flat tangent planes $T_{p_1}S^2, T_{p_2}S^2, T_{p_3}S^2$. The ship (red dot) sails along the **great-circle geodesic** (solid green, contrasted with the dashed grey detour) and projects simultaneously onto both adjacent tangent planes in each overlap region $U_\alpha \cap U_\beta$:
                 """
@@ -146,7 +161,7 @@ def _(mo):
             mo.md(
                 r"""
                 # Interactive Atlas & Geodesic Explorer
-                *Slide 5 of 6 — Live Chart Projections, Overlaps, and Geodesic Verification*
+                *Slide 5 of 7 — Live Chart Projections, Overlaps, and Geodesic Verification*
 
                 Toggle between **Geodesic (Great Circle)** and **Non-Geodesic Detour**, and drag $t \in [0, 1]$ to compare the ship's position, velocity vector $\dot{u}$ (blue arrow), and sideways steering / covariant acceleration vector $\nabla_{\dot{\gamma}}\dot{\gamma}$ (red arrow, non-zero only on the detour!):
                 """
@@ -465,7 +480,7 @@ def _(SphereAtlas, mo, np, plt, route_selector, voyage_slider):
 def _(mo):
     mo.md(r"""
     # Governing Equations: Charts, Transitions, Metric, and Geodesics
-    *Slide 6 of 6 — Complete Symbolic Summary*
+    *Slide 6 of 7 — Complete Symbolic Summary*
 
     ---
 
@@ -483,6 +498,93 @@ def _(mo):
     4. **Geodesic Equation & Great-Circle Parameterization on $S^2$**:
        $$\left(\nabla_{\dot{\gamma}}\dot{\gamma}\right)^k = \ddot{u}^k + \Gamma^k_{ij}(u, v)\,\dot{u}^i \dot{u}^j = 0 \quad \Longleftrightarrow \quad \gamma_{\text{geo}}(t) = \frac{\sin\bigl((1 - t)\Omega\bigr)}{\sin\Omega}\,p_0 + \frac{\sin(t\Omega)}{\sin\Omega}\,p_1, \quad \Omega = \arccos(\langle p_0, p_1 \rangle)$$
     """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(
+    SphereAtlas,
+    christoffel_symbols_autodiff,
+    mo,
+    np,
+    pullback_metric_autodiff,
+    torch,
+):
+    _chart = SphereAtlas.default_voyage_charts()[1]
+    _u_np = np.array([0.14, -0.19], dtype=np.float64)
+    _u_t = torch.tensor(_u_np, dtype=torch.float64)
+    _p_t = torch.tensor(_chart.center, dtype=torch.float64)
+    _e1_t = torch.tensor(_chart.e1, dtype=torch.float64)
+    _e2_t = torch.tensor(_chart.e2, dtype=torch.float64)
+
+    def _sphere_immersion(u):
+        w = torch.sqrt(1.0 - torch.sum(u * u))
+        return w * _p_t + u[0] * _e1_t + u[1] * _e2_t
+
+    _g_auto = pullback_metric_autodiff(_sphere_immersion, _u_t).detach().numpy()
+    _g_exact = _chart.metric_tensor(_u_np)
+    _g_err = float(np.max(np.abs(_g_auto - _g_exact)))
+
+    _gamma_auto = (
+        christoffel_symbols_autodiff(_sphere_immersion, _u_t).detach().numpy()
+    )
+    _gamma_exact = _chart.christoffel_symbols(_u_np)
+    _gamma_err = float(np.max(np.abs(_gamma_auto - _gamma_exact)))
+
+    # Smooth neural activation manifold f_theta: R^2 -> R^16 with Softplus
+    torch.manual_seed(7)
+    _W1 = torch.randn(16, 2, dtype=torch.float64) * 0.6
+    _b1 = torch.randn(16, dtype=torch.float64) * 0.2
+
+    def _nn_activation_map(u):
+        return torch.nn.functional.softplus(_W1 @ u + _b1)
+
+    _g_nn = pullback_metric_autodiff(_nn_activation_map, _u_t).detach().numpy()
+    _gamma_nn = (
+        christoffel_symbols_autodiff(_nn_activation_map, _u_t).detach().numpy()
+    )
+
+    mo.vstack(
+        [
+            mo.md(
+                r"""
+                # Modeling Deep Learning Activation Spaces via Riemannian Geometry & Autodiff
+                *Slide 7 of 7 — From $S^2$ to Neural Activation Manifolds with Automatic Differentiation*
+
+                ---
+
+                ### 1. The Activation Manifold of a Deep Learning Model
+                - **Natural Language**: On $S^2$, we derived the inverse chart $\varphi_\alpha^{-1}(u, v)$, metric $g_{ij}$, and Christoffel symbols $\Gamma^k_{ij}$ by hand because the sphere has a closed-form equation. In a deep neural network, an encoder or hidden layer maps local intrinsic coordinates $u \in U \subset \mathbb{R}^d$ into a high-dimensional activation space $h = f_\theta(u) \in \mathbb{R}^D$ ($D \gg d$), tracing out a curved **activation manifold** $\mathcal{M} = f_\theta(U) \subset \mathbb{R}^D$.
+                - **Why Smooth Activations Matter**: Because the Christoffel symbols $\Gamma^k_{ij}(u)$ depend on **second derivatives** of $f_\theta(u)$ (first derivatives of the metric $\partial_m g_{ij}$), piecewise-linear activations like $\text{ReLU}$ have zero second derivative almost everywhere and undefined curvature at hinges. Using smooth $C^\infty$ activations such as **$\text{Softplus}$** or **$\text{SMU}$ (Smooth Maximum Unit)** turns $f_\theta$ into a true smooth immersion with well-defined Riemannian curvature and geodesics everywhere.
+                - **Pullback Metric & Levi-Civita Connection from the Network Jacobian $J_{f_\theta}(u) = \frac{\partial f_\theta}{\partial u} \in \mathbb{R}^{D \times d}$**:
+                  $$g_{ij}(u) = \Bigl(J_{f_\theta}(u)^\top J_{f_\theta}(u)\Bigr)_{ij} = \sum_{a=1}^D \frac{\partial f_\theta^a}{\partial u^i}\frac{\partial f_\theta^a}{\partial u^j}, \qquad \Gamma^k_{ij}(u) = \frac{1}{2}\,g^{km}(u)\!\left(\frac{\partial g_{mi}}{\partial u^j} + \frac{\partial g_{mj}}{\partial u^i} - \frac{\partial g_{ij}}{\partial u^m}\right)$$
+
+                ---
+
+                ### 2. How Our Project Packages Power This via Automatic Differentiation
+                Every differential-geometric object on $\mathcal{M} = f_\theta(U)$ is computed **exactly** (to floating-point precision, with zero finite-difference truncation error) by composing the packages already installed in `pyproject.toml`:
+
+                | Project Package | Role in the Riemannian Activation-Space Pipeline |
+                | :--- | :--- |
+                | **`torch` & `torch.func`** (`jacrev`, `jacfwd`, `jvp`, `vjp`) | **1st-Order Autodiff**: `jacrev(f_theta)(u)` computes the exact chart/decoder Jacobian $J_{f_\theta}(u)$ and transition Jacobians $d\tau_{\alpha\beta}$, yielding the pullback metric $g(u) = J_{f_\theta}(u)^\top J_{f_\theta}(u)$.<br>**2nd-Order Autodiff**: Nesting `jacrev(lambda u: pullback_metric_autodiff(f_theta, u))(u)` differentiates right through the first-order graph to give the exact metric derivatives $\partial_m g_{ij}(u)$ and Christoffel symbols $\Gamma^k_{ij}(u)$. |
+                | **`scipy`** (`scipy.integrate.solve_ivp`, `solve_bvp`, `scipy.optimize`) | Integrates the **geodesic ODE** $\ddot{u}^k + \Gamma^k_{ij}(u)\dot{u}^i\dot{u}^j = 0$ and solves two-point boundary value problems between neural activations $h_0, h_1 \in \mathcal{M}$, calling PyTorch's autodiff $\Gamma^k_{ij}(u)$ at each solver step. |
+                | **`numpy`, `matplotlib`, `manim`, & `marimo`** | Bridges exact PyTorch tensors to 3D Manim animations (`SphereChartsScene`) and reactive Marimo notebooks for interactive exploration of charts, curvature, and geodesics. |
+
+                ---
+                """
+            ),
+            mo.md(
+                rf"""
+                ### 3. Live `torch.func.jacrev` Verification (`riemannian_manifolds.atlas.autodiff`)
+                Evaluating `pullback_metric_autodiff` and `christoffel_symbols_autodiff` at $u = ({_u_np[0]:+.2f}, {_u_np[1]:+.2f})$:
+                - **Benchmark on $S^2$ (Autodiff vs. Closed-Form Equations on Slide 6)**:
+                  $$\max_{{i,j}} \bigl|g^{{\text{{autodiff}}}}_{{ij}}(u) - g^{{\text{{exact}}}}_{{ij}}(u)\bigr| = {_g_err:.2e}, \qquad \max_{{k,i,j}} \bigl|\Gamma^{{k,\text{{autodiff}}}}_{{ij}}(u) - \Gamma^{{k,\text{{exact}}}}_{{ij}}(u)\bigr| = {_gamma_err:.2e}$$
+                - **Same Autodiff Pipeline Applied Directly to a Smooth `Softplus` Layer $f_\theta : \mathbb{{R}}^2 \to \mathbb{{R}}^{{16}}$**:
+                  $$g^{{\text{{NN}}}}_{{ij}}(u) = \begin{{pmatrix}} {_g_nn[0, 0]:.4f} & {_g_nn[0, 1]:.4f} \\ {_g_nn[1, 0]:.4f} & {_g_nn[1, 1]:.4f} \end{{pmatrix}}, \qquad \|\Gamma^{{\text{{NN}}}}(u)\|_{{\max}} = {float(np.max(np.abs(_gamma_nn))):.4f}$$
+                """
+            ),
+        ]
+    )
     return
 
 

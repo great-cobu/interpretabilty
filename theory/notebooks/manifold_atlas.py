@@ -531,19 +531,6 @@ def _(
     _gamma_exact = _chart.christoffel_symbols(_u_np)
     _gamma_err = float(np.max(np.abs(_gamma_auto - _gamma_exact)))
 
-    # Smooth neural activation manifold f_theta: R^2 -> R^16 with Softplus
-    torch.manual_seed(7)
-    _W1 = torch.randn(16, 2, dtype=torch.float64) * 0.6
-    _b1 = torch.randn(16, dtype=torch.float64) * 0.2
-
-    def _nn_activation_map(u):
-        return torch.nn.functional.softplus(_W1 @ u + _b1)
-
-    _g_nn = pullback_metric_autodiff(_nn_activation_map, _u_t).detach().numpy()
-    _gamma_nn = (
-        christoffel_symbols_autodiff(_nn_activation_map, _u_t).detach().numpy()
-    )
-
     mo.vstack(
         [
             mo.md(
@@ -576,11 +563,8 @@ def _(
             mo.md(
                 rf"""
                 ### 3. Live `torch.func.jacrev` Verification (`riemannian_manifolds.atlas.autodiff`)
-                Evaluating `pullback_metric_autodiff` and `christoffel_symbols_autodiff` at $u = ({_u_np[0]:+.2f}, {_u_np[1]:+.2f})$:
-                - **Benchmark on $S^2$ (Autodiff vs. Closed-Form Equations on Slide 6)**:
-                  $$\max_{{i,j}} \bigl|g^{{\text{{autodiff}}}}_{{ij}}(u) - g^{{\text{{exact}}}}_{{ij}}(u)\bigr| = {_g_err:.2e}, \qquad \max_{{k,i,j}} \bigl|\Gamma^{{k,\text{{autodiff}}}}_{{ij}}(u) - \Gamma^{{k,\text{{exact}}}}_{{ij}}(u)\bigr| = {_gamma_err:.2e}$$
-                - **Same Autodiff Pipeline Applied Directly to a Smooth `Softplus` Layer $f_\theta : \mathbb{{R}}^2 \to \mathbb{{R}}^{{16}}$**:
-                  $$g^{{\text{{NN}}}}_{{ij}}(u) = \begin{{pmatrix}} {_g_nn[0, 0]:.4f} & {_g_nn[0, 1]:.4f} \\ {_g_nn[1, 0]:.4f} & {_g_nn[1, 1]:.4f} \end{{pmatrix}}, \qquad \|\Gamma^{{\text{{NN}}}}(u)\|_{{\max}} = {float(np.max(np.abs(_gamma_nn))):.4f}$$
+                Evaluating `pullback_metric_autodiff` and `christoffel_symbols_autodiff` on $S^2$ at $u = ({_u_np[0]:+.2f}, {_u_np[1]:+.2f})$ against the closed-form equations on Slide 6:
+                $$\max_{{i,j}} \bigl|g^{{\text{{autodiff}}}}_{{ij}}(u) - g^{{\text{{exact}}}}_{{ij}}(u)\bigr| = {_g_err:.2e}, \qquad \max_{{k,i,j}} \bigl|\Gamma^{{k,\text{{autodiff}}}}_{{ij}}(u) - \Gamma^{{k,\text{{exact}}}}_{{ij}}(u)\bigr| = {_gamma_err:.2e}$$
                 """
             ),
         ]

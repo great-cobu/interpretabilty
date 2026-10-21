@@ -1,0 +1,134 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{array}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{parskip}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue!60!black,
+    urlcolor=blue!60!black,
+    citecolor=blue!60!black
+}
+
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+
+\title{\textbf{Mechanistic Interpretability via Riemannian Information Geometry on Activation Space}}
+\author{}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\noindent
+\textbf{Yes---with one crucial geometric extension:} Information Geometry naturally introduces \textbf{dual connections} $(\nabla, \nabla^*)$ in addition to the standard Riemannian Levi-Civita connection.
+
+When you treat a layer's activation space $H \subseteq \mathbb{R}^d$ as a manifold equipped with the \textbf{pullback Fisher Information Metric} from the network's output distribution $p(y \mid h)$, the core criteria of \textbf{Mechanistic Interpretability} (linear representations, disentanglement, superposition, and causal abstraction) translate directly into exact geometric conditions on the metric $g_{ij}(h)$ and the \textbf{Christoffel symbols $\Gamma^k_{ij}(h)$}.
+
+Below is the dictionary translating Mechanistic Interpretability criteria into Riemannian Information Geometry on activation space.
+
+\vspace{0.5em}
+\hrule
+\vspace{0.5em}
+
+\section{The Setup: The Metric on Activation Space}
+
+Let $h \in \mathbb{R}^d$ be the hidden activations at layer $\ell$, and let the rest of the network define a conditional probability distribution over outputs $p(y \mid h)$ (e.g., via a softmax over logits $z(h)$).
+
+The \textbf{Fisher Information Metric (FIM)} pulled back to activation space $h$ is:
+\[
+g_{ij}(h) = \mathbb{E}_{y \sim p(\cdot \mid h)} \left[ \frac{\partial \log p(y \mid h)}{\partial h^i} \frac{\partial \log p(y \mid h)}{\partial h^j} \right] = J(h)^\top I_z(h) J(h)
+\]
+where $J(h) = \frac{\partial z}{\partial h}$ is the Jacobian of the downstream network and $I_z(h)$ is the covariance of the output distribution.
+
+\begin{itemize}[leftmargin=*]
+    \item \textbf{What $g_{ij}(h)$ measures:} It measures \textbf{causal sensitivity}. A small step $\delta h$ has squared information distance:
+    \[
+    ds^2 = g_{ij}(h) \, \delta h^i \, \delta h^j = 2 \, D_{\text{KL}}\!\left(p(\cdot \mid h) \parallel p(\cdot \mid h + \delta h)\right).
+    \]
+    Directions in the nullspace of $g_{ij}(h)$ have \emph{zero downstream effect} on the output.
+\end{itemize}
+
+\section{Translating Mechanistic Interpretability Criteria into Geometry}
+
+\begin{table}[h!]
+\centering
+\small
+\renewcommand{\arraystretch}{1.4}
+\begin{tabularx}{\textwidth}{@{} >{\raggedright\arraybackslash}p{0.28\textwidth} Y Y @{}}
+\toprule
+\textbf{Mechanistic Interpretability Criterion} & \textbf{Riemannian / Information Geometric Definition} & \textbf{Condition on $g_{ij}$ and $\Gamma^k_{ij}$} \\
+\midrule
+\textbf{1. The Linear Representation Hypothesis} \newline \emph{(Features are constant directions)} &
+\textbf{Autoparallelism / Flatness:} Moving along a feature direction transports the feature meaning without rotating it into other features. &
+\textbf{$\Gamma^k_{ij}(h) = 0$} in the feature coordinate basis (it forms an \textbf{affine / Riemann normal} coordinate system). \\
+\addlinespace
+\textbf{2. Feature Disentanglement \& Monosemanticity} \newline \emph{(Features don't interfere)} &
+\textbf{Metric Orthogonality \& Decomposability:} The manifold splits into a Riemannian product of independent submanifolds $M = M_1 \times M_2 \times \dots$ &
+\textbf{$g_{ij}(h)$ is block-diagonal} ($g_{ij} = 0$ for $i \neq j$) and $\partial_m g_{ij} = 0$ across blocks ($\Gamma^k_{ij}$ doesn't mix blocks). \\
+\addlinespace
+\textbf{3. Polysemanticity \& Superposition} \newline \emph{(More features $F$ than neurons $d$)} &
+\textbf{Degenerate / Frame-Bundle Packing:} $F > d$ vector fields $\{v_a\}_{a=1}^F$ packed into tangent space $T_h M$ with minimal information interference. &
+Off-diagonal metric inner products $g_h(v_a, v_b) = v_a^i g_{ij}(h) v_b^j \approx \epsilon$ are kept small on the active data submanifold. \\
+\addlinespace
+\textbf{4. Contextual Routing / Attention Gating} \newline \emph{(Feature A changes how Feature B is read)} &
+\textbf{Non-zero Christoffel Cross-Terms / Holonomy:} Moving along feature $i$ rotates or scales the downstream sensitivity of feature $j$. &
+\textbf{$\Gamma^k_{ij}(h) \neq 0$} for $i \neq j$, and the \textbf{Riemann curvature} $R^l_{ijk} \neq 0$ measures non-commutativity of features. \\
+\addlinespace
+\textbf{5. Causal Scrubbing / Activation Patching} \newline \emph{(Replacing $h$ along a subspace)} &
+\textbf{Geodesic Projection (Information Bottleneck):} Projecting $h$ onto a submanifold $S$ that minimizes KL-divergence to the true output. &
+Orthogonal projection with respect to $g_{ij}$ (specifically, \textbf{$\nabla^*$-geodesic projection} in dually flat geometry). \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Why Christoffel Symbols Are the Exact Measure of ``Non-Linearity of Meaning''}
+
+Returning to the original question: \textbf{Why do we care that $\Gamma^k_{ij}$ is coordinate-dependent?}
+
+In Mechanistic Interpretability, \textbf{choosing a dictionary of features (e.g., via a Sparse Autoencoder or coordinate change $h \mapsto f(h)$) IS choosing a coordinate system on activation space.}
+
+\begin{itemize}[leftmargin=*]
+    \item Suppose you are in the raw neuron basis $h^1, \dots, h^d$. Because neurons are polysemantic and downstream layers are nonlinear, a concept vector $v(h)$ (``is a Golden Gate Bridge'') changes its direction in neuron space depending on context $h$. Thus, in neuron coordinates, $\Gamma^k_{ij} \neq 0$.
+    \item \textbf{The goal of finding an ``interpretable feature basis'' $f^a(h)$} is literally the geometric problem of finding a coordinate transformation $h \mapsto f(h)$ that \textbf{flattens the connection}---making $\Gamma^{c'}_{a'b'} \approx 0$ so that ``straight lines in feature space correspond to constant causal paths in output distribution space.''
+    \item \textbf{When is the Linear Representation Hypothesis strictly impossible?}
+    Because the \textbf{Riemann Curvature Tensor} $R^l_{ijk}$ \emph{is} coordinate-free, if $R^l_{ijk}(h) \neq 0$ on the activation manifold, \textbf{no coordinate transformation (not even a non-linear SAE) can make $\Gamma^k_{ij} = 0$ everywhere.} Non-zero Riemann curvature is the exact, coordinate-free obstruction to globally linear, non-interacting features!
+\end{itemize}
+
+\section{The Information Geometry Secret Weapon: Amari's Dual Connections (\texorpdfstring{$\nabla^{(e)}$ and $\nabla^{(m)}$}{e- and m-connections})}
+
+Pure Riemannian geometry only uses the Levi-Civita connection $\nabla^{(0)}$ (derived from $g_{ij}$). \textbf{Information Geometry} (pioneered by Shun-ichi Amari) goes one step further and defines a pair of \textbf{dual connections}:
+
+\begin{enumerate}[leftmargin=*]
+    \item \textbf{The $e$-connection ($\nabla^{(e)}$, exponential / log-linear):} A straight line ($\Gamma^{(e)k}_{ij} = 0$) in this geometry means \textbf{logits add linearly}.
+    \begin{itemize}
+        \item \emph{Crucial insight:} If the final layer of a Transformer is just a linear unembedding + Softmax ($p(y \mid h) \propto \exp(W h)$), then the final hidden layer $h$ is \textbf{naturally $e$-flat ($\Gamma^{(e)k}_{ij} = 0$)}! This is the mathematical reason why the \textbf{Linear Representation Hypothesis works so well in the final residual stream} of LLMs: in the $e$-connection of Information Geometry, linear directions in $h$ \emph{are} exact geodesics of log-probability!
+    \end{itemize}
+    \item \textbf{The $m$-connection ($\nabla^{(m)}$, mixture / expectation):} A straight line ($\Gamma^{(m)k}_{ij} = 0$) in this geometry means \textbf{probabilities mix linearly} (expectation parameters interpolate linearly).
+\end{enumerate}
+
+When an intermediate layer $h_\ell$ passes through nonlinear MLPs and Attention layers before reaching the logits, it embeds a curved submanifold inside that $e$-flat output space. The \textbf{second fundamental form (extrinsic curvature)} and induced \textbf{Christoffel symbols $\Gamma^{(e)k}_{ij}$} of layer $\ell$ measure \emph{precisely} how much the remaining layers bend the feature representations before readout.
+
+\section{Two Important Caveats to Keep in Mind}
+
+If you want to formalize mechanistic interpretability this way, there are two mathematical hurdles you have to handle:
+
+\begin{enumerate}[leftmargin=*]
+    \item \textbf{The Metric is Singular (Rank-Deficient):} If activation space has dimension $d = 4096$ and the output classification has $C = 10$ classes (or even $V = 50,000$ tokens where only a few tokens have non-zero probability at once), the Fisher metric $g_{ij}(h)$ is \textbf{degenerate} ($\text{rank} \le \min(d, V-1)$, and effectively much lower). Because $g_{ij}$ is not invertible, $g^{km}$ does not exist everywhere!
+    \begin{itemize}
+        \item \emph{Solution:} You either regularize the metric ($g_{ij} + \lambda \delta_{ij}$, moving to a Fisher-Rao + Euclidean geometry on the active data manifold) or work on the \textbf{quotient manifold} modulo the nullspace $\ker(g)$ (which neatly quotients out causally irrelevant activation directions!).
+    \end{itemize}
+    \item \textbf{ReLU / GELU Smoothness:} ReLU networks create piecewise-linear manifolds where derivatives jump at activation boundaries (concentrating all curvature onto codimension-1 polytope boundaries), whereas GELU/SiLU (used in modern Transformers) make the activation manifold genuinely $C^\infty$ smooth, so $\Gamma^k_{ij}$ is well-defined everywhere.
+\end{enumerate}
+
+\end{document}

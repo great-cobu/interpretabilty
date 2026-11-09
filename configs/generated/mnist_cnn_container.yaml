@@ -11,6 +11,7 @@ data:
   split_indices: null
 model:
   dropout: 0.2
+  activation: relu
 optimizer:
   learning_rate: 0.001
   weight_decay: 0.0
@@ -32,5 +33,6 @@ tracking:
   tags:
     model: mnist_cnn
     dataset: mnist
+    activation: relu
     managed_by: swi-prolog
 output_dir: runs/mnist-cnn-container-demo

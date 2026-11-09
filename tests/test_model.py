@@ -4,8 +4,9 @@ import pytest
 import torch
 from torch.nn import functional as F
 
+from models.MNIST.cli import main as cli_main
 from models.MNIST.config import load_config
-from models.MNIST.model import MNISTCNN, MNISTClassifier, inspect_model
+from models.MNIST.model import MNISTCNN, MNISTClassifier, SMU, inspect_model
 
 
 @pytest.mark.parametrize("batch_size", [1, 7, 32])
@@ -57,4 +58,48 @@ def test_inspect_model_writes_summary(tmp_path):
     report = inspect_model(cfg, tmp_path)
     assert report["output_shape"] == [5, 10]
     assert report["parameter_count"] == 421_642
+    assert report["activation"] == "relu"
     assert (tmp_path / "model_summary.json").is_file()
+
+
+@pytest.mark.parametrize(
+    ("activation", "expected_cls"),
+    [
+        ("relu", torch.nn.ReLU),
+        ("softplus", torch.nn.Softplus),
+        ("smu", SMU),
+        ("SMU", SMU),
+    ],
+)
+def test_configurable_activations_and_cli_override(tmp_path, activation, expected_cls):
+    cfg = load_config(
+        overrides={
+            "data.batch_size": 4,
+            "trainer.accelerator": "cpu",
+            "model.activation": activation,
+        },
+        use_environment=False,
+    )
+    clf = MNISTClassifier(cfg)
+    assert clf.network.activation == activation
+    assert isinstance(clf.network.layers.relu1, expected_cls)
+    assert isinstance(clf.network.layers.relu2, expected_cls)
+    assert isinstance(clf.network.layers.relu3, expected_cls)
+    assert sum(p.numel() for p in clf.parameters()) == 421_642
+
+    out_dir = tmp_path / f"inspect_{activation}"
+    rc = cli_main([
+        "inspect-model",
+        "--accelerator", "cpu",
+        "--batch-size", "4",
+        "--activation", activation,
+        "--output-dir", str(out_dir),
+    ])
+    assert rc == 0
+    reloaded = load_config(out_dir / "config.yaml", use_environment=False)
+    assert reloaded.model.activation == activation
+
+
+def test_invalid_activation_rejected():
+    with pytest.raises(ValueError, match="activation"):
+        MNISTCNN(activation="tanh")

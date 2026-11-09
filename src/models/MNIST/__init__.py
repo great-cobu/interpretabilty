@@ -3,7 +3,7 @@
 from models.MNIST.config import Config, ConfigError, DataConfig, ModelConfig, OptimizerConfig, TrackingConfig, TrainerConfig, load_config
 from models.MNIST.data import MNISTDataModule, inspect_data, prepare_data, resolve_accelerator
 from models.MNIST.evaluate import confusion_matrix, load_classifier, predict, test_checkpoint
-from models.MNIST.model import MNISTCNN, MNISTClassifier, inspect_model
+from models.MNIST.model import MNISTCNN, MNISTClassifier, SMU, inspect_model
 from models.MNIST.train import learning_curves, train, train_demo
 
 __version__ = "0.1.0"
@@ -22,6 +22,7 @@ __all__ = [
     "prepare_data",
     "inspect_data",
     "resolve_accelerator",
+    "SMU",
     "MNISTCNN",
     "MNISTClassifier",
     "inspect_model",

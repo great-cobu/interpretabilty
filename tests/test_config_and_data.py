@@ -26,6 +26,7 @@ def test_load_config_defaults_and_overrides(tmp_path, monkeypatch):
         {"data.batch_size": 0},
         {"trainer.max_epochs": -1},
         {"model.dropout": 1.0},
+        {"model.activation": "tanh"},
         {"optimizer.learning_rate": 0.0},
         {"trainer.accelerator": "tpu"},
         {"unknown.key": 1},
@@ -44,6 +45,15 @@ def test_prepare_run_dir_writes_yaml(tmp_path):
     assert (out / "config.yaml").is_file()
     reloaded = load_config(out / "config.yaml", use_environment=False)
     assert reloaded == resolved
+
+
+def test_prolog_generated_mnist_cnn_config_loads():
+    cfg = load_config("configs/generated/mnist_cnn_container.yaml", use_environment=False)
+    assert cfg.model.activation == "relu"
+    assert cfg.tracking.enabled is True
+    assert cfg.tracking.tags.get("model") == "mnist_cnn"
+    assert cfg.tracking.tags.get("activation") == "relu"
+    assert cfg.tracking.tags.get("managed_by") == "swi-prolog"
 
 
 def test_datamodule_deterministic_splits_and_roundtrip(tmp_path, patch_mnist):

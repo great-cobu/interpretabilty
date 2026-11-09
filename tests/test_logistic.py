@@ -10,6 +10,7 @@ from torch.nn import functional as F
 
 from models.MNIST.config import load_config
 from models.logistic.cli import main
+from models.main import main as top_level_main
 from models.logistic.evaluate import (
     confusion_matrix,
     load_classifier,
@@ -92,6 +93,35 @@ def test_logistic_cli_and_module_help():
     assert console.returncode == mod_main.returncode == 0
 
 
+def test_top_level_models_dispatch_flexible_flag_order(tmp_path):
+    out_log = tmp_path / "dispatch_logistic"
+    rc_log = top_level_main([
+        "inspect-model",
+        "--accelerator", "cpu",
+        "--batch-size", "4",
+        "--model", "logistic",
+        "--output-dir", str(out_log),
+    ])
+    assert rc_log == 0
+    summary_log = json.loads((out_log / "model_summary.json").read_text())
+    assert summary_log["model"] == "LogisticRegression"
+
+    out_cnn = tmp_path / "dispatch_cnn"
+    rc_cnn = top_level_main([
+        "inspect-model",
+        "--accelerator", "cpu",
+        "--batch-size", "4",
+        "--model=cnn",
+        "--activation", "SMU",
+        "--output-dir", str(out_cnn),
+    ])
+    assert rc_cnn == 0
+    summary_cnn = json.loads((out_cnn / "model_summary.json").read_text())
+    assert summary_cnn["activation"] == "SMU"
+
+    assert top_level_main(["inspect-model", "--model", "unknown"]) == 2
+
+
 def test_logistic_lbfgs_fit_test_and_predict_end_to_end(tmp_path, patch_mnist):
     run1 = tmp_path / "run1"
     rc = main([
@@ -110,6 +140,7 @@ def test_logistic_lbfgs_fit_test_and_predict_end_to_end(tmp_path, patch_mnist):
     summary1 = json.loads((run1 / "training_summary.json").read_text())
     assert summary1["model"] == "LogisticRegression"
     assert summary1["solver"] == "L-BFGS"
+    assert summary1["accelerator"] == "cpu"
     assert summary1["weight_decay"] == 0.01
     assert summary1["solver_iterations"] >= 1
 

@@ -6,7 +6,8 @@ import sys
 import yaml
 
 from models.MNIST import __version__
-from models.MNIST.config import ConfigError, config_dict, load_config, prepare_run_dir
+from models.MNIST.config import VALID_ACTIVATIONS, ConfigError, config_dict, load_config, prepare_run_dir
+from models.base import add_common_cli_arguments, load_checkpoint_base_config
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -27,23 +28,9 @@ def build_parser() -> argparse.ArgumentParser:
             sub.add_argument("--resume", help="Local checkpoint (.ckpt) to resume from")
         if name == "test":
             sub.add_argument("--checkpoint", required=True, help="Explicit local checkpoint to measure")
-        sub.add_argument("--limit-train-batches", dest="trainer.limit_train_batches", type=int)
-        sub.add_argument("--limit-val-batches", dest="trainer.limit_val_batches", type=int)
-        sub.add_argument("--config", help="YAML configuration path; otherwise built-in defaults")
-        sub.add_argument("--output-dir", help="Output directory; default: unique path in runs/")
-        sub.add_argument("--data-dir", dest="data.directory")
-        sub.add_argument("--download", dest="data.download", action=argparse.BooleanOptionalAction, default=None)
-        sub.add_argument("--batch-size", dest="data.batch_size", type=int)
-        sub.add_argument("--num-workers", dest="data.num_workers", type=int)
-        sub.add_argument("--split-seed", dest="data.split_seed", type=int)
-        sub.add_argument("--split-indices", dest="data.split_indices")
-        sub.add_argument("--seed", dest="trainer.seed", type=int)
-        sub.add_argument("--max-epochs", dest="trainer.max_epochs", type=int)
-        sub.add_argument("--accelerator", dest="trainer.accelerator", choices=("auto", "cpu", "cuda", "mps"))
-        sub.add_argument("--learning-rate", dest="optimizer.learning_rate", type=float)
+        add_common_cli_arguments(sub)
         sub.add_argument("--dropout", dest="model.dropout", type=float)
-        sub.add_argument("--tracking-enabled", dest="tracking.enabled", action=argparse.BooleanOptionalAction, default=None)
-        sub.add_argument("--tracking-uri", dest="tracking.uri")
+        sub.add_argument("--activation", dest="model.activation", choices=VALID_ACTIVATIONS)
     return parser
 
 
@@ -59,12 +46,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         base_cfg = None
         if (resume or checkpoint_path) and path is None:
-            import torch
-            ckpt_file = resume or checkpoint_path
-            saved = torch.load(ckpt_file, map_location="cpu", weights_only=True)
-            base_cfg = saved.get("hyper_parameters", {}).get("config")
-            if isinstance(base_cfg, dict):
-                base_cfg = dict(base_cfg, output_dir=None)
+            base_cfg = load_checkpoint_base_config(resume or checkpoint_path)
 
         config = load_config(path, overrides, base=base_cfg)
         if command != "check-config":

@@ -1,7 +1,7 @@
 [project]
 name = "riemannian-manifolds"
 version = "0.1.0"
-description = "Add your description here"
+description = "Riemannian geometry, local tangent-plane atlases, and PyTorch jacrev autodiff for activation manifolds"
 readme = "README.md"
 authors = [
     { name = "Frank W Elliott Jr", email = "frank_elliott@mac.com" }

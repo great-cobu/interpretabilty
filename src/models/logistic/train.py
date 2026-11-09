@@ -11,8 +11,8 @@ import torch
 from torch.nn import functional as F
 
 from models.MNIST.config import Config, config_dict, load_config, prepare_run_dir
-from models.MNIST.data import MNISTDataModule
-from models.MNIST.train import environment, sha256, trainer_options
+from models.MNIST.data import MNISTDataModule, resolve_accelerator
+from models.MNIST.train import environment, sha256
 from models.logistic.evaluate import load_classifier, save_class_templates_plot
 from models.logistic.model import LogisticClassifier
 
@@ -37,8 +37,9 @@ def train(
 ) -> dict:
     """Fit LogisticClassifier to convex optimality using full-batch L-BFGS with L2 regularization."""
     pl.seed_everything(config.trainer.seed, workers=True)
-    options = trainer_options(config)
-    data = MNISTDataModule(config.data, accelerator="cpu")
+    resolve_accelerator(config.trainer.accelerator)
+    execution_device = "cpu"
+    data = MNISTDataModule(config.data, accelerator=execution_device)
 
     saved_ckpt = None
     if resume is not None:
@@ -163,7 +164,7 @@ def train(
         "class_templates_plot": str(templates_path.resolve()),
         "mlflow_run_id": mlflow_run_id,
         "mlflow_experiment_id": mlflow_experiment_id,
-        "accelerator": options["accelerator"],
+        "accelerator": execution_device,
         "environment": environment(),
         "smoke_run": config.trainer.limit_train_batches is not None or config.trainer.limit_val_batches is not None,
         "metrics": metrics,

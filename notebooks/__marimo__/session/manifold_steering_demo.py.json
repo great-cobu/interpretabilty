@@ -1,0 +1,139 @@
+{
+  "version": "1",
+  "metadata": {
+    "marimo_version": "0.25.1",
+    "script_metadata_hash": null
+  },
+  "cells": [
+    {
+      "id": "Hbol",
+      "code_hash": "568ebbbe9b04ffc294c872874adce85a",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "MJUe",
+      "code_hash": "98fec6bee452804d2e79564c2f769d13",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/html": "<div class=\"mnist-prose mnist-supporting\"><span class=\"markdown prose dark:prose-invert contents\"><h1 id=\"riemannian-activation-manifold-steering-interactive-demo\">Riemannian Activation Manifold Steering \u2014 Interactive Demo</h1>\n<span class=\"paragraph\">When steering a neural network representation from a starting concept <marimo-tex class=\"arithmatex\">||(x_A||)</marimo-tex> toward a target concept <marimo-tex class=\"arithmatex\">||(x_B||)</marimo-tex>, <strong>Euclidean linear steering</strong> (<marimo-tex class=\"arithmatex\">||(u_{\\text{lin}}(t) = (1 - t)u_A + t u_B||)</marimo-tex>) moves in a straight line in flat coordinates, cutting blindly through regions of high curvature and rapid representation distortion.</span>\n<span class=\"paragraph\">Equipping the local chart <marimo-tex class=\"arithmatex\">||(u = (u^1, u^2) \\in \\mathbb{R}^2||)</marimo-tex> with the <strong>pullback Riemannian metric</strong> <marimo-tex class=\"arithmatex\">||(g_{ij}(u) = (J_h(u)^\\top J_h(u))_{ij}||)</marimo-tex> (or the <strong>Fisher Information Metric</strong> <marimo-tex class=\"arithmatex\">||(g^F_{ij}(u)||)</marimo-tex>) and <strong>Christoffel symbols</strong> <marimo-tex class=\"arithmatex\">||(\\Gamma^k_{ij}(u)||)</marimo-tex> via <code>torch.func.jacrev</code> allows us to compute <strong>Riemannian geodesic steering trajectories</strong> that minimize path energy:</span>\n<marimo-tex class=\"arithmatex\">||[E[\\gamma] = \\frac{1}{2}\\int_0^1 g_{ij}(\\gamma(t))\\,\\dot{\\gamma}^i(t)\\,\\dot{\\gamma}^j(t)\\,dt \\qquad \\Longleftrightarrow \\qquad \\ddot{\\gamma}^k(t) + \\Gamma^k_{ij}(\\gamma(t))\\,\\dot{\\gamma}^i(t)\\,\\dot{\\gamma}^j(t) = 0||]</marimo-tex></span></div>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "vblA",
+      "code_hash": "5e2e30d19648cb050a576bd0fc1dba8b",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/html": "<div style='display: flex;flex: 1;flex-direction: column;justify-content: flex-start;align-items: normal;flex-wrap: nowrap;gap: 0.5rem'><div class=\"mnist-prose mnist-supporting\"><span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"1-select-or-train-a-smooth-cnn-smu-softplus\">1. Select or Train a Smooth CNN (<code>SMU</code> / <code>Softplus</code>)</h2>\n<span class=\"paragraph\">Second-order automatic differentiation (<code>christoffel_symbols</code>) requires a <marimo-tex class=\"arithmatex\">||(C^2||)</marimo-tex>-smooth activation function such as <strong><code>SMU</code></strong> or <strong><code>Softplus</code></strong>. Train a new checkpoint below or pick an existing run.</span></span></div><marimo-ui-element object-id='vblA-11' random-id='8ca39d23-f9ed-693b-755b-46651b7fcd41'><marimo-form data-initial-value='null' data-label='null' data-element-id='&quot;vblA-10&quot;' data-loading='false' data-bordered='true' data-submit-button-label='&quot;Train smooth CNN checkpoint&quot;' data-submit-button-disabled='false' data-clear-on-submit='false' data-show-clear-button='false' data-clear-button-label='&quot;Clear&quot;' data-should-validate='false'><marimo-ui-element object-id='vblA-10' random-id='dbe2be3f-3322-9233-930d-67692f3673a2'><marimo-dict data-initial-value='{&quot;activation&quot;:[&quot;SMU (Smooth Maximum Unit \u2014 C^\u221e smooth)&quot;],&quot;epochs&quot;:2,&quot;threads&quot;:8}' data-label='null' data-element-ids='{&quot;vblA-7&quot;:&quot;activation&quot;,&quot;vblA-8&quot;:&quot;epochs&quot;,&quot;vblA-9&quot;:&quot;threads&quot;}'><marimo-json-output data-json-data='{&quot;activation&quot;:&quot;text/html:&#92;u003cmarimo-ui-element object-id=&#x27;vblA-7&#x27; random-id=&#x27;1cc1e997-f2a4-e6fc-f9c4-22b69b71c543&#x27;&#92;u003e&#92;u003cmarimo-dropdown data-initial-value=&#x27;[&amp;quot;SMU (Smooth Maximum Unit \u2014 C^\u221e smooth)&amp;quot;]&#x27; data-label=&#x27;&amp;quot;&amp;#92;u003cspan class=&amp;#92;&amp;quot;markdown prose dark:prose-invert contents&amp;#92;&amp;quot;&amp;#92;u003e&amp;#92;u003cspan class=&amp;#92;&amp;quot;paragraph&amp;#92;&amp;quot;&amp;#92;u003eCNN Activation Function&amp;#92;u003c/span&amp;#92;u003e&amp;#92;u003c/span&amp;#92;u003e&amp;quot;&#x27; data-options=&#x27;[&amp;quot;SMU (Smooth Maximum Unit \u2014 C^\u221e smooth)&amp;quot;,&amp;quot;Softplus (C^\u221e smooth)&amp;quot;,&amp;quot;ReLU (piecewise linear \u2014 zero 2nd derivative)&amp;quot;]&#x27; data-allow-select-none=&#x27;false&#x27; data-searchable=&#x27;false&#x27; data-full-width=&#x27;false&#x27; data-disabled=&#x27;false&#x27;&#92;u003e&#92;u003c/marimo-dropdown&#92;u003e&#92;u003c/marimo-ui-element&#92;u003e&quot;,&quot;epochs&quot;:&quot;text/html:&#92;u003cmarimo-ui-element object-id=&#x27;vblA-8&#x27; random-id=&#x27;00e2c728-e97b-2345-5ada-123fe9d5ebfe&#x27;&#92;u003e&#92;u003cmarimo-number data-initial-value=&#x27;2&#x27; data-label=&#x27;&amp;quot;&amp;#92;u003cspan class=&amp;#92;&amp;quot;markdown prose dark:prose-invert contents&amp;#92;&amp;quot;&amp;#92;u003e&amp;#92;u003cspan class=&amp;#92;&amp;quot;paragraph&amp;#92;&amp;quot;&amp;#92;u003eTraining epochs&amp;#92;u003c/span&amp;#92;u003e&amp;#92;u003c/span&amp;#92;u003e&amp;quot;&#x27; data-start=&#x27;1&#x27; data-stop=&#x27;20&#x27; data-step=&#x27;1&#x27; data-debounce=&#x27;false&#x27; data-full-width=&#x27;false&#x27; data-disabled=&#x27;false&#x27;&#92;u003e&#92;u003c/marimo-number&#92;u003e&#92;u003c/marimo-ui-element&#92;u003e&quot;,&quot;threads&quot;:&quot;text/html:&#92;u003cmarimo-ui-element object-id=&#x27;vblA-9&#x27; random-id=&#x27;c66e0fcc-179d-de9e-1db7-532c246473c0&#x27;&#92;u003e&#92;u003cmarimo-number data-initial-value=&#x27;8&#x27; data-label=&#x27;&amp;quot;&amp;#92;u003cspan class=&amp;#92;&amp;quot;markdown prose dark:prose-invert contents&amp;#92;&amp;quot;&amp;#92;u003e&amp;#92;u003cspan class=&amp;#92;&amp;quot;paragraph&amp;#92;&amp;quot;&amp;#92;u003eCPU threads&amp;#92;u003c/span&amp;#92;u003e&amp;#92;u003c/span&amp;#92;u003e&amp;quot;&#x27; data-start=&#x27;1&#x27; data-stop=&#x27;16&#x27; data-step=&#x27;1&#x27; data-debounce=&#x27;false&#x27; data-full-width=&#x27;false&#x27; data-disabled=&#x27;false&#x27;&#92;u003e&#92;u003c/marimo-number&#92;u003e&#92;u003c/marimo-ui-element&#92;u003e&quot;}' data-value-types='&quot;python&quot;' data-name='&quot;dictionary&quot;'></marimo-json-output></marimo-dict></marimo-ui-element></marimo-form></marimo-ui-element></div>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "bkHC",
+      "code_hash": "458e2780910007e392a25aaa48b0cab0",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/html": "<div class=\"mnist-prose\"><span class=\"markdown prose dark:prose-invert contents\"><span class=\"paragraph\">Saved smooth steering run: <code>/Users/frankelliott/Documents/Projects/Python/interpetability/runs/steering-smu-83c80ea5</code></span></span></div>"
+          }
+        }
+      ],
+      "console": [
+        {
+          "type": "stream",
+          "name": "stderr",
+          "text": "Seed set to 42\nGPU available: True (mps), used: False\nTPU available: False, using: 0 TPU cores\n/Users/frankelliott/Documents/Projects/Python/interpetability/.venv/lib/python3.14/site-packages/lightning/pytorch/trainer/setup.py:175: GPU available but not used. You can set it by doing `Trainer(accelerator='gpu')`.\n\ud83d\udca1 Tip: For seamless cloud logging and experiment tracking, try installing [litlogger](https://pypi.org/project/litlogger/) to enable LitLogger, which logs metrics and artifacts automatically to the Lightning Experiments platform.\n/Users/frankelliott/Documents/Projects/Python/interpetability/.venv/lib/python3.14/site-packages/lightning/pytorch/utilities/_pytree.py:21: `isinstance(treespec, LeafSpec)` is deprecated, use `isinstance(treespec, TreeSpec) and treespec.is_leaf()` instead.\n/Users/frankelliott/Documents/Projects/Python/interpetability/.venv/lib/python3.14/site-packages/lightning/pytorch/trainer/connectors/data_connector.py:434: The 'train_dataloader' does not have many workers which may be a bottleneck. Consider increasing the value of the `num_workers` argument` to `num_workers=15` in the `DataLoader` to improve performance.\n/Users/frankelliott/Documents/Projects/Python/interpetability/.venv/lib/python3.14/site-packages/lightning/pytorch/trainer/connectors/data_connector.py:434: The 'val_dataloader' does not have many workers which may be a bottleneck. Consider increasing the value of the `num_workers` argument` to `num_workers=15` in the `DataLoader` to improve performance.\n`Trainer.fit` stopped: `max_epochs=20` reached.\n",
+          "mimetype": "text/plain"
+        }
+      ]
+    },
+    {
+      "id": "lEQa",
+      "code_hash": "4541ed997b63c2b0d0b40db1ef4d08f2",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/html": "<marimo-ui-element object-id='lEQa-0' random-id='7e5d7aab-8b37-65cd-4ffd-764112a8fe26'><marimo-dropdown data-initial-value='[&quot;steering-smu-83c80ea5&quot;]' data-label='&quot;&#92;u003cspan class=&#92;&quot;markdown prose dark:prose-invert contents&#92;&quot;&#92;u003e&#92;u003cspan class=&#92;&quot;paragraph&#92;&quot;&#92;u003eSaved MNISTCNN run&#92;u003c/span&#92;u003e&#92;u003c/span&#92;u003e&quot;' data-options='[&quot;steering-smu-83c80ea5&quot;,&quot;steering-smu-5976499d&quot;,&quot;marimo-demo-d34ea93b7ca0&quot;,&quot;marimo-demo-fca62790d064&quot;,&quot;marimo-demo-182e40560bee&quot;,&quot;marimo-demo-f581e781eba9&quot;,&quot;mnist-cnn-container-demo&quot;,&quot;stage5-smoke&quot;,&quot;stage6-resume&quot;,&quot;preliminary-demo&quot;]' data-allow-select-none='false' data-searchable='false' data-full-width='false' data-disabled='false'></marimo-dropdown></marimo-ui-element>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "PKri",
+      "code_hash": "557f23dad93a72eaab4fc2302bb8aedb",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/html": "<div class=\"mnist-prose\"><span class=\"markdown prose dark:prose-invert contents\"><span class=\"paragraph\">Loaded <strong><code>MNISTClassifier</code></strong> with activation <strong><code>SMU</code></strong> on CPU.</span></span></div>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "Xref",
+      "code_hash": "672f52f75ec11d0e50c9ed20ecb518e6",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/html": "<div class=\"mnist-prose\"><span class=\"markdown prose dark:prose-invert contents\"><span class=\"paragraph\">Loaded 5,000 validation examples for tangent-chart construction.</span></span></div>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "SFPL",
+      "code_hash": "161df071e625f29fec255ab9515566dd",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/html": "<div style='display: flex;flex: 1;flex-direction: column;justify-content: flex-start;align-items: normal;flex-wrap: nowrap;gap: 0.5rem'><div class=\"mnist-prose mnist-supporting\"><span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"2-configure-the-2d-local-chart-riemannian-metric\">2. Configure the 2D Local Chart &amp; Riemannian Metric</h2>\n<span class=\"paragraph\">Three validation digits <marimo-tex class=\"arithmatex\">||((x_A, x_B, x_C)||)</marimo-tex> span an orthonormal 2D affine chart <marimo-tex class=\"arithmatex\">||(\\varphi^{-1}(u^1, u^2) = x_A + u^1 e_1 + u^2 e_2||)</marimo-tex> in image space. Use the sliders to compare <strong>Euclidean Linear Steering</strong> against <strong>Riemannian Geodesic Steering</strong>.</span></span></div><div style='display: flex;flex: 1;flex-direction: row;justify-content: flex-start;align-items: normal;flex-wrap: nowrap;gap: 0.5rem'><marimo-ui-element object-id='SFPL-0' random-id='e3e5049c-c4cb-94fd-9500-2734517ed466'><marimo-dropdown data-initial-value='[&quot;Digit 3&quot;]' data-label='&quot;&#92;u003cspan class=&#92;&quot;markdown prose dark:prose-invert contents&#92;&quot;&#92;u003e&#92;u003cspan class=&#92;&quot;paragraph&#92;&quot;&#92;u003eStart digit (x_A)&#92;u003c/span&#92;u003e&#92;u003c/span&#92;u003e&quot;' data-options='[&quot;Digit 0&quot;,&quot;Digit 1&quot;,&quot;Digit 2&quot;,&quot;Digit 3&quot;,&quot;Digit 4&quot;,&quot;Digit 5&quot;,&quot;Digit 6&quot;,&quot;Digit 7&quot;,&quot;Digit 8&quot;,&quot;Digit 9&quot;]' data-allow-select-none='false' data-searchable='false' data-full-width='false' data-disabled='false'></marimo-dropdown></marimo-ui-element><marimo-ui-element object-id='SFPL-1' random-id='4138d7cf-16e1-6c77-879a-a595eaaf44b8'><marimo-dropdown data-initial-value='[&quot;Digit 8&quot;]' data-label='&quot;&#92;u003cspan class=&#92;&quot;markdown prose dark:prose-invert contents&#92;&quot;&#92;u003e&#92;u003cspan class=&#92;&quot;paragraph&#92;&quot;&#92;u003eTarget digit (x_B)&#92;u003c/span&#92;u003e&#92;u003c/span&#92;u003e&quot;' data-options='[&quot;Digit 0&quot;,&quot;Digit 1&quot;,&quot;Digit 2&quot;,&quot;Digit 3&quot;,&quot;Digit 4&quot;,&quot;Digit 5&quot;,&quot;Digit 6&quot;,&quot;Digit 7&quot;,&quot;Digit 8&quot;,&quot;Digit 9&quot;]' data-allow-select-none='false' data-searchable='false' data-full-width='false' data-disabled='false'></marimo-dropdown></marimo-ui-element><marimo-ui-element object-id='SFPL-2' random-id='a78cf29c-177a-239a-0a6b-e8273f3f9a7e'><marimo-dropdown data-initial-value='[&quot;Digit 5&quot;]' data-label='&quot;&#92;u003cspan class=&#92;&quot;markdown prose dark:prose-invert contents&#92;&quot;&#92;u003e&#92;u003cspan class=&#92;&quot;paragraph&#92;&quot;&#92;u003ePlane reference digit (x_C)&#92;u003c/span&#92;u003e&#92;u003c/span&#92;u003e&quot;' data-options='[&quot;Digit 0&quot;,&quot;Digit 1&quot;,&quot;Digit 2&quot;,&quot;Digit 3&quot;,&quot;Digit 4&quot;,&quot;Digit 5&quot;,&quot;Digit 6&quot;,&quot;Digit 7&quot;,&quot;Digit 8&quot;,&quot;Digit 9&quot;]' data-allow-select-none='false' data-searchable='false' data-full-width='false' data-disabled='false'></marimo-dropdown></marimo-ui-element><marimo-ui-element object-id='SFPL-3' random-id='15ccbd7c-a174-cd47-16fc-05da8f46f26d'><marimo-dropdown data-initial-value='[&quot;Pullback Activation Metric g_ij = (J_h^T J_h)_ij&quot;]' data-label='&quot;&#92;u003cspan class=&#92;&quot;markdown prose dark:prose-invert contents&#92;&quot;&#92;u003e&#92;u003cspan class=&#92;&quot;paragraph&#92;&quot;&#92;u003eRiemannian Metric on Chart&#92;u003c/span&#92;u003e&#92;u003c/span&#92;u003e&quot;' data-options='[&quot;Pullback Activation Metric g_ij = (J_h^T J_h)_ij&quot;,&quot;Pullback Fisher Information Metric g^F_ij&quot;]' data-allow-select-none='false' data-searchable='false' data-full-width='false' data-disabled='false'></marimo-dropdown></marimo-ui-element></div><div style='display: flex;flex: 1;flex-direction: row;justify-content: flex-start;align-items: normal;flex-wrap: nowrap;gap: 0.5rem'><marimo-ui-element object-id='SFPL-4' random-id='ceb7fd0f-7b73-b7ec-f7cb-d9bba7467fd8'><marimo-slider data-initial-value='0' data-label='&quot;&#92;u003cspan class=&#92;&quot;markdown prose dark:prose-invert contents&#92;&quot;&#92;u003e&#92;u003cspan class=&#92;&quot;paragraph&#92;&quot;&#92;u003eValidation example index&#92;u003c/span&#92;u003e&#92;u003c/span&#92;u003e&quot;' data-start='0' data-stop='25' data-step='1' data-steps='[]' data-debounce='false' data-disabled='false' data-orientation='&quot;horizontal&quot;' data-show-value='false' data-include-input='false' data-full-width='false'></marimo-slider></marimo-ui-element><marimo-ui-element object-id='SFPL-5' random-id='93f7bb49-c6eb-67f9-f755-18d1f10812b3'><marimo-slider data-initial-value='0.5' data-label='&quot;&#92;u003cspan class=&#92;&quot;markdown prose dark:prose-invert contents&#92;&quot;&#92;u003e&#92;u003cspan class=&#92;&quot;paragraph&#92;&quot;&#92;u003eSteering parameter t \u2208 [0, 1]&#92;u003c/span&#92;u003e&#92;u003c/span&#92;u003e&quot;' data-start='0.0' data-stop='1.0' data-step='0.05' data-steps='[]' data-debounce='false' data-disabled='false' data-orientation='&quot;horizontal&quot;' data-show-value='false' data-include-input='false' data-full-width='false'></marimo-slider></marimo-ui-element></div></div>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "BYtC",
+      "code_hash": "7d93244704680ee0122e8da1a5d52129",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "RGSE",
+      "code_hash": "be608b3cbf531959e06895188e9870d2",
+      "outputs": [],
+      "console": []
+    }
+  ]
+}

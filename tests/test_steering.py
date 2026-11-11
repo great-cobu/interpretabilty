@@ -1,4 +1,7 @@
-"""Tests for Riemannian activation manifold steering on MNIST (Option A)."""
+"""Tests for Stage 1 Riemannian manifold steering primitives."""
+
+import json
+import math
 
 import pytest
 import torch
@@ -6,85 +9,115 @@ import torch
 from models.MNIST.model import MNISTCNN
 from models.MNIST.steering import (
     TangentChart2D,
-    christoffel_symbols,
-    pullback_activation_metric,
-    pullback_fisher_metric,
-    shoot_geodesic,
-    solve_bvp_geodesic,
-    train_smooth_demo,
+    discover_cnn_runs,
+    evaluate_decision_landscape,
 )
 
 
-def _sample_chart() -> TangentChart2D:
-    torch.manual_seed(11)
-    xa = torch.randn(1, 28, 28)
-    xb = torch.randn(1, 28, 28)
-    xc = torch.randn(1, 28, 28)
-    return TangentChart2D.from_three_images(xa, xb, xc)
-
-
-def test_tangent_chart_2d_orthonormal_roundtrip():
-    chart = _sample_chart()
-    assert torch.allclose(chart.e1.norm(), torch.tensor(1.0), atol=1e-6)
-    assert torch.allclose(chart.e2.norm(), torch.tensor(1.0), atol=1e-6)
-    assert torch.allclose((chart.e1 * chart.e2).sum(), torch.tensor(0.0), atol=1e-6)
-
-    u_pts = torch.tensor([[0.0, 0.0], [1.5, -0.7], [-0.4, 2.1]])
-    imgs = chart.decode(u_pts)
-    assert imgs.shape == (3, 1, 28, 28)
-    recovered = chart.encode(imgs)
-    torch.testing.assert_close(recovered, u_pts, rtol=1e-5, atol=1e-5)
-
-
-def test_pullback_metrics_and_christoffel_symbols_with_smu():
-    torch.manual_seed(42)
-    chart = _sample_chart()
-    model = MNISTCNN(activation="SMU").eval()
-    u = torch.tensor([0.6, 0.4])
-
-    g_act = pullback_activation_metric(model, chart, u, damping=1e-2)
-    g_fish = pullback_fisher_metric(model, chart, u, damping=1e-2)
-    assert g_act.shape == (2, 2)
-    assert g_fish.shape == (2, 2)
-    assert torch.allclose(g_act, g_act.T, atol=1e-6)
-    assert torch.allclose(g_fish, g_fish.T, atol=1e-6)
-    assert torch.linalg.eigvalsh(g_act).min() > 0
-    assert torch.linalg.eigvalsh(g_fish).min() > 0
-
-    metric_fn = lambda coords: pullback_activation_metric(model, chart, coords, damping=1e-2)
-    gamma = christoffel_symbols(metric_fn, u)
-    assert gamma.shape == (2, 2, 2)
-    assert torch.isfinite(gamma).all()
-    # Torsion-free symmetry: Gamma^k_{ij} == Gamma^k_{ji}
-    torch.testing.assert_close(gamma, gamma.transpose(1, 2), rtol=1e-5, atol=1e-5)
-    assert float(gamma.detach().norm()) > 0.0
-
-
-def test_shoot_and_solve_bvp_geodesic():
+def test_gram_schmidt_chart_orthonormality_and_exact_anchors():
     torch.manual_seed(7)
-    chart = _sample_chart()
-    model = MNISTCNN(activation="SMU").eval()
-    metric_fn = lambda coords: pullback_activation_metric(model, chart, coords, damping=1e-2)
+    x_a = torch.randn(1, 28, 28)
+    x_b = torch.randn(1, 28, 28)
+    x_c = torch.randn(1, 28, 28)
 
-    ivp = shoot_geodesic(metric_fn, chart.u_a, torch.tensor([1.0, 0.5]), num_steps=8)
-    assert ivp["u"].shape == (9, 2)
-    assert torch.isfinite(ivp["u"]).all()
+    chart = TangentChart2D.from_three_images(x_a, x_b, x_c)
 
-    bvp = solve_bvp_geodesic(
-        metric_fn,
-        chart.u_a,
-        chart.u_b,
-        num_nodes=8,
-        opt_steps=10,
-        lr=0.05,
-    )
-    assert bvp["geodesic_u"].shape == (8, 2)
-    torch.testing.assert_close(bvp["geodesic_u"][0], chart.u_a)
-    torch.testing.assert_close(bvp["geodesic_u"][-1], chart.u_b)
-    assert bvp["geodesic_energy"] <= bvp["linear_energy"] + 1e-6
+    # Orthonormality of basis vectors e1, e2
+    assert torch.isclose(chart.e1.norm(), torch.tensor(1.0), atol=1e-6)
+    assert torch.isclose(chart.e2.norm(), torch.tensor(1.0), atol=1e-6)
+    assert torch.isclose((chart.e1 * chart.e2).sum(), torch.tensor(0.0), atol=1e-6)
+
+    # Anchor coordinate geometry: u_a = (0, 0), u_b = (||x_b - x_a||, 0), u_c^2 > 0
+    assert torch.allclose(chart.u_a, torch.zeros(2), atol=1e-6)
+    assert chart.u_b[0] > 0.0 and abs(float(chart.u_b[1])) < 1e-6
+    assert chart.u_c[1] > 0.0
+
+    # Exact reconstruction of all three anchors
+    assert torch.allclose(chart.decode(chart.u_a), x_a, atol=1e-5)
+    assert torch.allclose(chart.decode(chart.u_b), x_b, atol=1e-5)
+    assert torch.allclose(chart.decode(chart.u_c), x_c, atol=1e-5)
+
+    # Isometric property: chart Euclidean distance equals exact L2 image distance
+    u_p = torch.tensor([1.5, -2.25])
+    u_q = torch.tensor([-0.75, 3.1])
+    chart_dist = (u_p - u_q).norm()
+    pixel_dist = (chart.decode(u_p) - chart.decode(u_q)).norm()
+    assert torch.isclose(chart_dist, pixel_dist, atol=1e-5)
 
 
-def test_train_smooth_demo_helper(tmp_path, patch_mnist):
-    out = train_smooth_demo(tmp_path, activation="SMU", epochs=1, threads=1)
-    assert (out / "checkpoints" / "best.ckpt").is_file()
-    assert (out / "training_summary.json").is_file()
+def test_gram_schmidt_rejects_degenerate_anchors():
+    x = torch.ones(1, 28, 28)
+    y = torch.zeros(1, 28, 28)
+    with pytest.raises(ValueError, match="distinct"):
+        TangentChart2D.from_three_images(x, x, y)
+    with pytest.raises(ValueError, match="collinear"):
+        TangentChart2D.from_three_images(x, y, 0.5 * (x + y))
+
+
+def test_tangent_pca_chart_with_geomstats():
+    torch.manual_seed(11)
+    samples = torch.randn(24, 1, 28, 28)
+    chart = TangentChart2D.from_tangent_pca(samples, samples[0], samples[1], samples[2])
+
+    assert chart.mode == "tangent_pca"
+    assert chart.explained_variance_ratio is not None
+    assert len(chart.explained_variance_ratio) == 2
+    assert 0.0 < chart.explained_variance_ratio[0] <= 1.0
+    assert chart.explained_variance_ratio[0] >= chart.explained_variance_ratio[1] > 0.0
+
+    assert torch.isclose(chart.e1.norm(), torch.tensor(1.0), atol=1e-6)
+    assert torch.isclose(chart.e2.norm(), torch.tensor(1.0), atol=1e-6)
+    assert torch.isclose((chart.e1 * chart.e2).sum(), torch.tensor(0.0), atol=1e-6)
+
+    # Batch decode -> encode round-trip on in-plane points is exact
+    coords = torch.tensor([[0.0, 0.0], [2.0, -1.5], [-3.2, 4.1]])
+    decoded = chart.decode(coords)
+    assert decoded.shape == (3, 1, 28, 28)
+    reencoded = chart.encode(decoded)
+    assert torch.allclose(reencoded, coords, atol=1e-5)
+
+
+def test_evaluate_decision_landscape_on_smooth_cnn():
+    torch.manual_seed(19)
+    model = MNISTCNN(dropout=0.0, activation="SMU").eval()
+    x_a, x_b, x_c = torch.randn(1, 28, 28), torch.randn(1, 28, 28), torch.randn(1, 28, 28)
+    chart = TangentChart2D.from_three_images(x_a, x_b, x_c)
+
+    landscape = evaluate_decision_landscape(model, chart, resolution=15)
+    assert landscape.u1.shape == (15,)
+    assert landscape.u2.shape == (15,)
+    assert landscape.predictions.shape == (15, 15)
+    assert landscape.confidence.shape == (15, 15)
+    assert landscape.entropy.shape == (15, 15)
+    assert landscape.probabilities.shape == (15, 15, 10)
+
+    prob_sums = landscape.probabilities.sum(dim=-1)
+    assert torch.allclose(prob_sums, torch.ones_like(prob_sums), atol=1e-5)
+    assert (landscape.confidence >= 0.1 - 1e-5).all() and (landscape.confidence <= 1.0 + 1e-5).all()
+    assert (landscape.entropy >= -1e-6).all() and (landscape.entropy <= math.log(10.0) + 1e-5).all()
+
+
+def test_discover_cnn_runs_prioritizes_smooth_and_skips_logistic(tmp_path):
+    def _make_run(name: str, activation: str | None, experiment: str, val_acc: float):
+        run_dir = tmp_path / "runs" / name
+        (run_dir / "checkpoints").mkdir(parents=True)
+        (run_dir / "checkpoints" / "best.ckpt").write_bytes(b"stub")
+        model_block = f"  dropout: 0.2\n  activation: {activation}\n" if activation else "  dropout: 0.0\n"
+        (run_dir / "config.yaml").write_text(
+            f"model:\n{model_block}tracking:\n  experiment_name: {experiment}\n"
+        )
+        (run_dir / "training_summary.json").write_text(
+            json.dumps({"completed_epochs": 5, "metrics": {"val/accuracy": val_acc}})
+        )
+
+    _make_run("relu-cnn", "relu", "mnist-cnn", 0.99)
+    _make_run("smu-cnn", "SMU", "mnist-cnn", 0.98)
+    _make_run("logistic-demo-1", None, "mnist-logistic", 0.92)
+
+    all_cnn = discover_cnn_runs(tmp_path, smooth_only=False)
+    assert [r.run_dir.name for r in all_cnn] == ["smu-cnn", "relu-cnn"]
+    assert all_cnn[0].is_smooth is True
+    assert all_cnn[1].is_smooth is False
+
+    smooth_only = discover_cnn_runs(tmp_path, smooth_only=True)
+    assert [r.run_dir.name for r in smooth_only] == ["smu-cnn"]

@@ -50,7 +50,7 @@ uv run models inspect-model --model cnn --activation softplus --accelerator cpu
 uv run marimo edit notebooks/mnist_demo.py
 uv run marimo edit notebooks/logistic_demo.py
 
-# Riemannian activation manifold steering demo (Option A)
+# Riemannian manifold steering demo (incremental 4-stage build)
 uv run marimo edit notebooks/manifold_steering_demo.py
 
 # Riemannian manifold & tangent-plane atlas notebooks
@@ -71,5 +71,5 @@ All container orchestration files and generated experiment configs are derived f
 
 * **Container & MLOps Stack**: [`DOCKER_SETUP.md`](DOCKER_SETUP.md) and [`prolog/README.md`](prolog/README.md)
 * **MNIST CNN Specification & Walkthroughs**: [`doc/md/models/MNIST/README.md`](doc/md/models/MNIST/README.md)
-* **Manifold Steering Roadmap (Option A & Planned Option B LLM Steering)**: [`doc/md/models/MNIST/spec/manifold_steering_roadmap.md`](doc/md/models/MNIST/spec/manifold_steering_roadmap.md)
+* **Manifold Steering Primer & Architecture**: [`doc/md/models/MNIST/manifold_steering_primer.md`](doc/md/models/MNIST/manifold_steering_primer.md) and [`theory/manifold_steering_design.pdf`](theory/manifold_steering_design.pdf)
 * **Riemannian Manifolds & Geometry Theory**: [`theory/README.md`](theory/README.md)

@@ -631,6 +631,23 @@ http = [
 ]
 
 [[package]]
+name = "geomstats"
+version = "2.8.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "joblib" },
+    { name = "matplotlib" },
+    { name = "numpy" },
+    { name = "pandas" },
+    { name = "scikit-learn" },
+    { name = "scipy" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/cc/d9/a99cd1b545d0ac3117bc6246e144755559a9a2fed734137db6ec214a083b/geomstats-2.8.0.tar.gz", hash = "sha256:d34df1ed96354859f694dfea2f58080d34f6e82bb0a5e49061d49ec213ef48a0", size = 9887212, upload-time = "2024-09-09T17:41:44.859Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/16/2e/b8e0c53367d4a55338a4dd4e55cfcd560f5a5441f3906a106cee7cf9f1fb/geomstats-2.8.0-py3-none-any.whl", hash = "sha256:bd167c944586cb822c4cd6466fd70fc0819f6eb9a8c0e3de4971de4033ff4276", size = 10467124, upload-time = "2024-09-09T17:41:39.168Z" },
+]
+
+[[package]]
 name = "gitdb"
 version = "4.0.12"
 source = { registry = "https://pypi.org/simple" }
@@ -1150,6 +1167,7 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "cryptography" },
+    { name = "geomstats" },
     { name = "kubernetes" },
     { name = "lightning" },
     { name = "matplotlib" },
@@ -1161,6 +1179,7 @@ dependencies = [
     { name = "requests" },
     { name = "scikit-learn" },
     { name = "scipy" },
+    { name = "stochman" },
     { name = "torch" },
     { name = "torchmetrics" },
     { name = "torchvision" },
@@ -1183,6 +1202,7 @@ notebooks = [
 [package.metadata]
 requires-dist = [
     { name = "cryptography", specifier = ">=42.0.5" },
+    { name = "geomstats", specifier = ">=2.8.0" },
     { name = "kubernetes", specifier = ">=36.0.3" },
     { name = "lightning", specifier = ">=2.6" },
     { name = "matplotlib", specifier = ">=3.10" },
@@ -1195,6 +1215,7 @@ requires-dist = [
     { name = "requests", specifier = ">=2.31.0" },
     { name = "scikit-learn", specifier = ">=1.4.1.post1" },
     { name = "scipy", specifier = ">=1.12.0" },
+    { name = "stochman", specifier = ">=0.3.0" },
     { name = "torch", specifier = ">=2.9" },
     { name = "torchmetrics", specifier = ">=1.8" },
     { name = "torchvision", specifier = ">=0.24" },
@@ -2185,6 +2206,18 @@ sdist = { url = "https://files.pythonhosted.org/packages/b5/b4/205b0d5241d934e8a
 wheels = [
     { url = "https://files.pythonhosted.org/packages/c8/cb/6a6a47d5b464bd08695d254f3da6e7986cc70c9fa5d778eda57538edfe56/starlette-1.6.0-py3-none-any.whl", hash = "sha256:a86dd39d14bb45f85a3d18525215a9ef0cfd1f192ac793220e72598c90335f0c", size = 75969, upload-time = "2026-08-08T18:27:56.196Z" },
 ]
+
+[[package]]
+name = "stochman"
+version = "0.3.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "matplotlib" },
+    { name = "networkx" },
+    { name = "numpy" },
+    { name = "torch" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/35/f5/0dfe4bfa43ceca1b1e966120008e427a95795645bbf5c1feb2d541a9364d/stochman-0.3.0.tar.gz", hash = "sha256:ea61ac094da19f5552474231ba7be3d9d3adbaa86cc93caeec6356410beb8843", size = 33411, upload-time = "2022-06-10T08:11:07.636Z" }
 
 [[package]]
 name = "sympy"

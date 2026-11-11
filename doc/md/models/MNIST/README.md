@@ -12,5 +12,6 @@ Stages 1–6 are implemented: uv/Python packaging, validated command-line config
 
 - [Training, resume, and testing instructions](instructions/training.md)
 - [Stage 5–6 review and verification results](instructions/stage-5-6-review.md)
+- [Calculus-based primer on Riemannian manifold steering](manifold_steering_primer.md)
 
 Maintain project Markdown documents in this directory and specifications in `spec/` and operational guides in `instructions/`.

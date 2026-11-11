@@ -1,0 +1,477 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsfonts,amsthm}
+\usepackage{mathtools}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{array}
+\usepackage{xcolor}
+\usepackage{enumitem}
+\usepackage{parskip}
+\usepackage{microtype}
+\usepackage{hyperref}
+
+\setlength{\emergencystretch}{1.5em}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue!60!black,
+    urlcolor=blue!60!black,
+    citecolor=blue!60!black,
+    pdftitle={Riemannian Manifold Steering: Theory, Step-by-Step Demo Architecture, and Ecosystem Guide},
+    pdfauthor={Frank W. Elliott Jr.}
+}
+
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\DKL}{D_{\mathrm{KL}}}
+\DeclareMathOperator{\diag}{diag}
+\DeclareMathOperator{\Exp}{Exp}
+\DeclareMathOperator{\Log}{Log}
+\DeclareMathOperator{\rank}{rank}
+
+\theoremstyle{definition}
+\newtheorem{definition}{Definition}[section]
+\newtheorem{remark}{Remark}[section]
+
+\title{\textbf{Riemannian Manifold Steering in Neural Networks}\\[0.4em]
+\large Mathematical Foundations, Step-by-Step Demo Architecture,\\and Python Ecosystem Guide}
+\author{}
+\date{November 11, 2026}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+\noindent
+Standard activation steering techniques---such as Activation Addition and Contrastive Activation Addition---intervene on neural representations by translating hidden vectors along straight Euclidean lines. While effective when features live in a flat affine subspace, straight-line interventions cut across low-density, high-curvature regions whenever the representation or output distribution is nonlinearly curved, causing off-manifold artifacts and abrupt behavioral jumps. \textbf{Manifold steering} replaces Euclidean translation with \textbf{Riemannian geodesic trajectories} computed under a metric pulled back from downstream hidden activations or output probability distributions (the Fisher Information Metric). This document (1)~presents a self-contained mathematical formulation of manifold steering and its relation to mechanistic interpretability, (2)~lays out a four-stage, step-by-step architecture for an interactive glass-box MNIST demonstration designed for immediate visual verification in Marimo, and (3)~evaluates the best Python packages and open-source projects for implementing pullback geometry, geodesic solvers, and neural interventions.
+\end{abstract}
+
+\tableofcontents
+
+\vspace{0.75em}
+\hrule
+\vspace{0.75em}
+
+% =============================================================================
+\section{What Is Manifold Steering?}
+\label{sec:what-is-manifold-steering}
+% =============================================================================
+
+\subsection{Linear Activation Steering and Its Geometric Limitations}
+
+In mechanistic interpretability and representation engineering, \emph{activation steering} modifies the internal activations $h \in \R^d$ of a trained network at inference time to guide model behavior from a source concept $A$ toward a target concept $B$ without updating model weights. Methods such as \textbf{Activation Addition (ActAdd)}~\cite{turner2023actadd}, \textbf{Representation Engineering (RepE)}~\cite{zou2023repe}, and \textbf{Contrastive Activation Addition (CAA)}~\cite{rimsky2024caa} construct a steering vector $v = \bar{h}_B - \bar{h}_A$ and apply an affine translation:
+\begin{equation}
+    h_{\mathrm{lin}}(t) = h_A + t \, v = (1 - t)\, h_A + t \, h_B, \qquad t \in [0, 1].
+    \label{eq:linear-steering}
+\end{equation}
+Implicitly, Eq.~\eqref{eq:linear-steering} assumes the \textbf{Linear Representation Hypothesis}~\cite{park2024linear}: that semantic concepts correspond to constant, flat directions across activation space. In differential-geometric terms, straight lines $t \mapsto (1-t)u_A + t u_B$ are geodesics if and only if the underlying space is flat---that is, its affine connection has vanishing \textbf{Christoffel symbols} $\Gamma^k_{ij} = 0$.
+
+Empirically and mathematically, pure Euclidean linearity breaks down in three common regimes:
+\begin{enumerate}[leftmargin=*]
+    \item \textbf{Curved Representation Submanifolds:} Even when inputs or hidden states are parameterized by low-dimensional coordinates $u \in \R^m$, nonlinear layers (convolutions, attention routing, gated MLPs) embed those coordinates as a curved submanifold inside downstream activation space~\cite{arvanitidis2018oddity,engels2024nonlinear}.
+    \item \textbf{Semantic Cliffs Near Decision Boundaries:} In Euclidean coordinates, a uniform step $\delta u$ can produce virtually zero change inside a confident class basin yet trigger a massive jump in logits across a decision boundary. Linear interpolation cuts straight through high-distortion ``semantic cliffs'' or ambiguous off-manifold mixtures~\cite{wurgaft2026manifold,oozeer2026riemannian}.
+    \item \textbf{Norm and Variance Drift:} Adding $t v$ in Euclidean space alters activation norms ($\|h_A + t v\|_2 \neq \|h_A\|_2$), often pushing representations outside the training distribution shell modeled by LayerNorm or RMSNorm~\cite{kazama2026geosteer}.
+\end{enumerate}
+
+\textbf{Manifold steering}~\cite{wurgaft2026manifold,oozeer2026riemannian,kazama2026geosteer} resolves these failure modes by equipping the representation chart with an intrinsic \textbf{Riemannian metric} $g_{ij}(u)$ that measures actual downstream representational or distributional change, and steering along \textbf{geodesics}---curves of minimum path energy and constant intrinsic speed.
+
+\subsection{Local Charts and Pullback Metrics on Neural Networks}
+
+Following the embedded-manifold and pullback formalism of Guigui, Miolane, and Pennec~\cite{guigui2023geomstats} and Arvanitidis et al.~\cite{arvanitidis2018oddity}, let $\psi = \varphi^{-1} : U \subseteq \R^m \to \mathcal{X}$ be a smooth $m$-dimensional local parametrization (inverse chart) mapping chart coordinates $u = (u^1, \dots, u^m) \in U$ into the network's input or latent intervention space $\mathcal{X} \subseteq \R^N$ ($m \ll N$). Let the downstream network define:
+\begin{itemize}[leftmargin=*]
+    \item a smooth hidden-layer feature map $f_\ell : \mathcal{X} \to \R^D$ at layer $\ell$, with composite immersion $h_\ell(u) \coloneqq (f_\ell \circ \psi)(u) \in \R^D$ and Jacobian $J_{h_\ell}(u) = \frac{\partial h_\ell(u)}{\partial u} \in \R^{D \times m}$; and
+    \item a conditional output distribution $p(y \mid u) = \mathrm{softmax}\!\bigl(z(\psi(u))\bigr) \in \Delta^{C-1}$ over $C$ classes (or vocabulary tokens), with logit Jacobian $J_z(u) = \frac{\partial z(\psi(u))}{\partial u} \in \R^{C \times m}$.
+\end{itemize}
+
+Pulling back the geometry of the network's representations or predictions onto $U$ yields two canonical Riemannian metrics:
+
+\begin{definition}[Regularized Pullback Activation Metric]
+Pulling back the Euclidean inner product $\langle \cdot, \cdot \rangle_{\R^D}$ on layer-$\ell$ activations via $h_\ell = f_\ell \circ \psi$, with Tikhonov damping $\lambda > 0$, defines the symmetric positive-definite (SPD) $m \times m$ metric tensor
+\begin{equation}
+    g^{\mathrm{act}}_{ij}(u) = \left(J_{h_\ell}(u)^\top J_{h_\ell}(u)\right)_{ij} + \lambda \, \delta_{ij}
+    = \sum_{a=1}^{D} \frac{\partial h_\ell^a(u)}{\partial u^i} \frac{\partial h_\ell^a(u)}{\partial u^j} + \lambda \, \delta_{ij}.
+    \label{eq:pullback-activation-metric}
+\end{equation}
+\end{definition}
+
+\begin{definition}[Regularized Pullback Fisher Information Metric]
+Pulling back the Fisher--Rao metric~\cite{amari2016infogeom,park2024linear} of the categorical output distribution $p(y \mid u)$ onto $U$ defines the $m \times m$ SPD metric tensor
+\begin{align}
+    g^{\mathrm{FIM}}_{ij}(u)
+    &= \E_{y \sim p(\cdot \mid u)} \!\left[ \frac{\partial \log p(y \mid u)}{\partial u^i} \frac{\partial \log p(y \mid u)}{\partial u^j} \right] + \lambda \, \delta_{ij} \nonumber \\
+    &= \Bigl( J_z(u)^\top \bigl(\diag(p(u)) - p(u)\, p(u)^\top\bigr) J_z(u) \Bigr)_{ij} + \lambda \, \delta_{ij}.
+    \label{eq:pullback-fisher-metric}
+\end{align}
+\end{definition}
+
+\paragraph{Geometric interpretation and role of damping $\lambda$.}
+For an infinitesimal chart step $\delta u$, the squared line element under $g^{\mathrm{FIM}}$ satisfies
+\[
+    ds^2 = g^{\mathrm{FIM}}_{ij}(u)\, \delta u^i \, \delta u^j
+    = 2 \, \DKL\!\bigl(p(\cdot \mid u) \parallel p(\cdot \mid u + \delta u)\bigr) + \lambda \|\delta u\|_2^2 + \mathcal{O}(\|\delta u\|^3).
+\]
+Thus $g^{\mathrm{FIM}}(u)$ assigns large Riemannian distance to regions where small coordinate shifts cause rapid distributional change (decision boundaries) and near-zero distance inside saturated plateaus. Because $\rank(J_z^\top I_z J_z) \le \min(m, C-1)$ can become ill-conditioned inside high-confidence regions where $p_c \to 1$, the small Euclidean baseline $\lambda \delta_{ij}$ (typically $\lambda \in [10^{-3}, 10^{-2}]$) acts as a Riemannian trust-region regularizer~\cite{arvanitidis2018oddity}, ensuring $g(u) \succeq \lambda I_m$ is strictly invertible everywhere. The associated \textbf{Riemannian volume element} (magnification factor)
+\begin{equation}
+    d\mathrm{Vol}_g(u) = \sqrt{\det g(u)} \, du^1 \cdots du^m
+    \label{eq:volume-element}
+\end{equation}
+provides an immediate scalar map of local representational sensitivity across the chart.
+
+\subsection{Geodesic Steering: Variational Energy vs.\ Geodesic ODE}
+
+Given a smooth curve $\gamma : [0, 1] \to U$, its \textbf{Riemannian arc length} $L[\gamma]$ and \textbf{kinetic path energy} (action functional) $E[\gamma]$ are
+\begin{equation}
+    L[\gamma] = \int_0^1 \sqrt{g_{ij}(\gamma(t))\, \dot{\gamma}^i(t)\, \dot{\gamma}^j(t)} \, dt,
+    \qquad
+    E[\gamma] = \frac{1}{2} \int_0^1 g_{ij}(\gamma(t))\, \dot{\gamma}^i(t)\, \dot{\gamma}^j(t) \, dt.
+    \label{eq:length-and-energy}
+\end{equation}
+By the Cauchy--Schwarz inequality, $L[\gamma]^2 \le 2 E[\gamma]$, with equality if and only if the intrinsic speed $\|\dot{\gamma}(t)\|_{g(\gamma(t))}$ is constant on $[0,1]$. Minimizing $E[\gamma]$ therefore simultaneously finds the shortest Riemannian path \emph{and} enforces constant-rate semantic progression (preventing sudden jumps across boundaries).
+
+The Euler--Lagrange equations of $E[\gamma]$ yield the \textbf{Levi-Civita geodesic ODE}~\cite{morgan2016riemannian,guigui2023geomstats}:
+\begin{equation}
+    \ddot{\gamma}^k(t) + \Gamma^k_{ij}(\gamma(t))\, \dot{\gamma}^i(t)\, \dot{\gamma}^j(t) = 0,
+    \qquad
+    \Gamma^k_{ij}(u) = \frac{1}{2} g^{kl}(u)\!\left( \frac{\partial g_{jl}}{\partial u^i} + \frac{\partial g_{il}}{\partial u^j} - \frac{\partial g_{ij}}{\partial u^l} \right),
+    \label{eq:geodesic-ode}
+\end{equation}
+where $g^{kl}(u) = (g(u)^{-1})_{kl}$. This gives rise to two complementary steering formulations:
+
+\begin{enumerate}[leftmargin=*]
+    \item \textbf{Boundary-Value Steering (BVP / $\Log_{u_A}(u_B)$):} Given fixed start and target anchors $\gamma(0) = u_A$ and $\gamma(1) = u_B$, minimize the discretized path energy over interior waypoints $\{u_1, \dots, u_{N-1}\}$ (with $u_0 = u_A, u_N = u_B$ and midpoints $\bar{u}_n = \frac{1}{2}(u_n + u_{n+1})$):
+    \begin{equation}
+        \min_{u_1, \dots, u_{N-1} \in \R^m} \; E_{\mathrm{disc}}(u_1, \dots, u_{N-1})
+        = \frac{N}{2} \sum_{n=0}^{N-1} (u_{n+1} - u_n)^\top \, g(\bar{u}_n) \, (u_{n+1} - u_n).
+        \label{eq:discrete-energy}
+    \end{equation}
+    \emph{Computational advantage:} Evaluating $E_{\mathrm{disc}}$ requires only first-order Jacobians ($g_{ij}$), and its gradient with respect to $\{u_n\}$ is obtained in a single reverse-mode pass without explicitly forming the $m^3$ Christoffel tensor at every optimizer step~\cite{arvanitidis2018oddity}.
+    \item \textbf{Initial-Value Geodesic Shooting (IVP / $\Exp_{u_A}(t v_0)$):} Given a starting state $u_A$ and an initial semantic velocity $v_0 \in T_{u_A}U$, integrate the first-order system $\dot{u} = v$, $\dot{v}^k = -\Gamma^k_{ij}(u) v^i v^j$ on $t \in [0, 1]$ using an explicit Runge--Kutta solver. This directly generalizes one-step direction addition ($u_A + t v_0$) to curved spaces.
+\end{enumerate}
+
+\begin{remark}[Why $C^2$-Smooth Activations Matter]
+Computing $\Gamma^k_{ij}(u)$ in Eq.~\eqref{eq:geodesic-ode} differentiates $g_{ij}(u) = (J^\top J)_{ij}$, which requires \textbf{second derivatives} $\frac{\partial^2 f_\theta}{\partial u^i \partial u^j}$ of the neural network. Standard $\mathrm{ReLU}(x) = \max(0, x)$ networks are piecewise affine: their Jacobian $J(u)$ is locally constant inside each linear activation polytope, so $\partial_l g_{ij}(u) = 0$ and $\Gamma^k_{ij}(u) = 0$ almost everywhere, concentrating all curvature into singular Dirac ridges along ReLU fold lines. Using $C^\infty$-smooth activations---such as $\mathrm{Softplus}_\beta(x) = \frac{1}{\beta}\log(1 + e^{\beta x})$ or the \textbf{Smooth Maximum Unit (SMU)}~\cite{biswas2022smu} already implemented in \texttt{src/models/MNIST/model.py}---makes $(U, g)$ a genuine $C^\infty$ Riemannian manifold with smooth, well-defined Christoffel symbols everywhere.
+\end{remark}
+
+% =============================================================================
+\section{Step-by-Step Implementation Plan for the Demo}
+\label{sec:implementation-plan}
+% =============================================================================
+
+\subsection{Lessons from the Removed Prototype}
+
+Our earlier prototype packed training forms, multiple metric toggles, BVP optimization, IVP shooting, and a multi-panel dashboard into a single 500-line notebook from the outset. That monolithic design obscured cause and effect, required training or locating a specialized smooth checkpoint before anything rendered, and made interactive iteration sluggish when recomputing non-vectorized grids.
+
+To make the new implementation transparent, fast, and pedagogical, we enforce three engineering rules:
+\begin{enumerate}[leftmargin=*]
+    \item \textbf{Zero-Configuration Startup:} Every stage loads an immediately usable smooth checkpoint (\texttt{SMU} or \texttt{softplus}) automatically---training and caching a compact default checkpoint once if none exists---so opening the Marimo notebook immediately renders concrete plots without clicking ``Submit'' on a form first.
+    \item \textbf{Batched Functional Vectorization (\texttt{vmap} + \texttt{jacrev}):} Instead of Python loops over a $G \times G$ grid, we evaluate $g_{ij}(u)$ across all $G^2$ chart points in a single batched call via \texttt{torch.func.vmap(torch.func.jacrev(fn))}, keeping $25 \times 25$ metric grids under $\sim 50\,\mathrm{ms}$ on Apple Silicon CPU/MPS.
+    \item \textbf{Strict Four-Stage Progression:} Each stage adds exactly one geometric concept, exposes a small, unit-tested function in \path{src/models/MNIST/steering.py}, and adds one self-contained visual section in \path{notebooks/manifold_steering_demo.py} that we inspect and verify before moving on.
+\end{enumerate}
+
+\subsection{The Four Incremental Stages}
+
+\begin{table}[ht!]
+\centering
+\small
+\renewcommand{\arraystretch}{1.35}
+\begin{tabularx}{\textwidth}{@{} l >{\raggedright\arraybackslash}p{0.25\textwidth} Y >{\raggedright\arraybackslash}p{0.26\textwidth} @{}}
+\toprule
+\textbf{Stage} & \textbf{Code Deliverable} & \textbf{Mathematical Object} & \textbf{Interactive Visual Verification} \\
+\midrule
+\textbf{Stage 1} & \path{TangentChart2D}, \texttt{Geomstats} \texttt{TangentPCA} / prototypes, smooth \texttt{MNISTCNN} & Orthonormal 2D chart $\psi(u^1, u^2) = x_0 + u^1 e_1 + u^2 e_2$ (anchor triple or \texttt{TangentPCA}) & 2D predicted-class \& confidence contour map + decoded $28\times 28$ anchor thumbnails \\
+\addlinespace
+\textbf{Stage 2} & \texttt{StochMan} \texttt{Manifold} subclass + \texttt{vmap}/\texttt{jacfwd} & $g^{\mathrm{act}}_{ij}(u)$, $g^{\mathrm{FIM}}_{ij}(u)$, and \path{log_volume} $\log\sqrt{\det g(u)}$ & Heatmap of $\log\sqrt{\det g(u)}$ overlaid with Tissot metric ellipses showing sensitivity directions \\
+\addlinespace
+\textbf{Stage 3} & \texttt{StochMan} \texttt{CubicSpline} + \path{connecting_geodesic} / L-BFGS & Minimum-energy curve $\gamma_{\mathrm{geo}}(t)$ vs.\ straight line $\gamma_{\mathrm{lin}}(t)$ from $x_A \to x_B$ & Curved vs.\ straight path on chart, side-by-side decoded digit strips, $p(y\mid \gamma(t))$ curves, and $(E, L)$ table \\
+\addlinespace
+\textbf{Stage 4} & \texttt{Geomstats} \texttt{PullbackMetric} / $\Gamma^k_{ij}(u)$ + \path{shoot_geodesic} & Levi-Civita $\Gamma^k_{ij}(u)$, second fundamental form $\mathrm{II}$, and $\Exp_{u_A}(t v_0)$ & Geodesic ODE residual check, initial-velocity ray fan, and \texttt{SMU}/\texttt{Softplus} vs.\ \texttt{ReLU} curvature ablation \\
+\bottomrule
+\end{tabularx}
+\caption{Four-stage incremental implementation roadmap for the MNIST manifold steering demo.}
+\label{tab:stages}
+\end{table}
+
+\paragraph{Stage 1: Orthonormal 2D Digit Plane and Decision Landscape.}
+Given three validation digits $(x_A, x_B, x_C) \in \R^{1 \times 28 \times 28}$ (for example, $x_A = \text{`4'}$, $x_B = \text{`9'}$, and $x_C = \text{`7'}$), Gram--Schmidt orthonormalization places $x_A$ at $u_A = (0, 0)$, $x_B$ along the positive $u^1$-axis at $u_B = (\|x_B - x_A\|_2, 0)$, and $x_C$ in the upper half-plane $u^2 > 0$:
+\[
+    e_1 = \frac{x_B - x_A}{\|x_B - x_A\|_2}, \qquad
+    \tilde{e}_2 = (x_C - x_A) - \langle x_C - x_A, e_1 \rangle e_1, \qquad
+    e_2 = \frac{\tilde{e}_2}{\|\tilde{e}_2\|_2}.
+\]
+Because $\{e_1, e_2\}$ is orthonormal in pixel space, Euclidean chart distances $\|u - u'\|_2$ equal exact $L_2$ pixel distances $\|\psi(u) - \psi(u')\|_2$---guaranteeing zero chart-induced distortion so that \emph{all} observed curvature in Stages~2--4 originates purely from the neural network. Stage~1 immediately renders the 2D class landscape $\arg\max_c p(c \mid \psi(u))$ and predictive entropy $H(p(\cdot \mid \psi(u)))$.
+
+\paragraph{Stage 2: Pullback Metric Field and Tissot Indicatrices.}
+Reusing the autodiff pattern from \path{theory/src/riemannian_manifolds/atlas/autodiff.py}, we vectorize \texttt{jacrev} over $u \in \R^2$ to compute $g^{\mathrm{act}}(u)$ (at conv/FC layers) and $g^{\mathrm{FIM}}(u)$ (at log-probabilities). On top of the $\sqrt{\det g(u)}$ heatmap, we draw \textbf{Tissot indicatrices} (small ellipses proportional to $g(u)^{-1/2}$, corresponding to unit Riemannian balls $\{ \delta u : \delta u^\top g(u) \delta u = r^2 \}$): thin, compressed ellipses straddling class boundaries immediately reveal the ``steep walls'' of the manifold, while elongated axes reveal local null directions ($\ker g$).
+
+\paragraph{Stage 3: Boundary-Value Geodesic Steering ($x_A \to x_B$).}
+We parameterize $\gamma : [0,1] \to \R^2$ over $N \approx 32$ segments (or low-degree cubic splines) initialized at the Euclidean chord $\gamma_{\mathrm{lin}}(t) = (1-t)u_A + t u_B$, and minimize $E_{\mathrm{disc}}$ in Eq.~\eqref{eq:discrete-energy} via SciPy's \texttt{L-BFGS-B} with exact PyTorch reverse-mode gradients \path{torch.func.value_and_grad}. Visually, the user sees $\gamma_{\mathrm{geo}}(t)$ bend around high-metric barriers or route smoothly through shared morphological features (e.g., morphing stroke topology cleanly rather than superimposing ghosted pixel averages), accompanied by side-by-side decoded image strips and class-probability plots.
+
+\paragraph{Stage 4: Christoffel Diagnostics, IVP Geodesic Shooting, and Smoothness Ablation.}
+Finally, we wire second-order \texttt{jacrev} to evaluate $\Gamma^k_{ij}(u)$ along trajectories and expose \path{shoot_geodesic} via \path{scipy.integrate.solve_ivp(..., method="RK45")}. This stage verifies two key theoretical predictions from \path{theory/mechanistic_interpretability_geometry.tex}:
+\begin{enumerate}[leftmargin=*]
+    \item Shooting from $u_A$ with the initial BVP tangent $v_0 = \dot{\gamma}_{\mathrm{geo}}(0)$ reproduces $\gamma_{\mathrm{geo}}(t)$, confirming consistency between the variational ($E_{\mathrm{disc}}$) and connection ($\Gamma^k_{ij}$) formulations.
+    \item Switching the checkpoint from \texttt{SMU}/\texttt{Softplus} to \texttt{ReLU} causes $\Gamma^k_{ij}(u)$ to collapse to zero inside linear regions while $E_{\mathrm{disc}}$ still detects finite-step boundary crossings---demonstrating concretely why $C^2$ smoothness is essential for differential-geometric steering.
+\end{enumerate}
+
+\subsection{Natural Bridge to Transformer Residual-Stream Steering}
+
+Because every stage operates on an abstract chart $\psi : \R^m \to \mathcal{X}$ and downstream differentiable map $f : \mathcal{X} \to \R^D$, extending the demo from MNIST pixel/feature planes to an open-weight Transformer (e.g., \texttt{Llama-3.2-1B} or \texttt{Qwen2.5-1.5B} on Apple Silicon MPS) requires replacing only $\psi$ and $f$: $\psi(u) = h_{\ell,0} + \sum_{i=1}^m u^i e_i$ becomes a local PCA or contrastive subspace chart in residual stream $\R^{d_{\mathrm{model}}}$ at layer $\ell$, and $f$ maps $h_\ell$ through layers $\ell+1 \dots L$ to the top-$K$ active next-token log-probabilities.
+
+% =============================================================================
+\section{Best Packages and Open-Source Projects to Use}
+\label{sec:packages-and-projects}
+% =============================================================================
+
+All candidate packages below were checked against this repository's Python~3.14 environment (\texttt{requires-python = ">=3.14,<3.15"} managed by \texttt{uv}). We group them into three tiers: (1)~the core stack already installed in \texttt{pyproject.toml}, (2)~specialized Riemannian geometry libraries, and (3)~mechanistic interpretability intervention frameworks for subsequent LLM experiments.
+
+\subsection{Tier 1: Core Runtime \& Installed Riemannian Stack}
+
+Our \texttt{pyproject.toml} combines PyTorch functional autodiff and SciPy numerical solvers with two complementary Riemannian geometry packages---\textbf{StochMan} (\texttt{stochman>=0.3.0}) and \textbf{Geomstats} (\texttt{geomstats>=2.8.0})---giving us both glass-box \texttt{torch.func} primitives and battle-tested spline/manifold abstractions:
+
+\begin{itemize}[leftmargin=*]
+    \item \textbf{PyTorch \texttt{torch.func} (\texttt{jacrev}, \texttt{jvp}, \texttt{vjp}, \texttt{vmap}, \texttt{grad})} ---
+    \href{https://pytorch.org/docs/stable/func.html}{Documentation} $\mid$ \href{https://github.com/pytorch/pytorch}{GitHub}.\\
+    Composable, JAX-style functional transforms built directly into PyTorch~$\ge 2.0$ (we run \texttt{torch>=2.9})~\cite{paszke2019pytorch}. For a low-dimensional chart $u \in \R^m$ ($m \in \{2, \dots, 8\}$) mapped into high-dimensional activations $h \in \R^D$ or logits $z \in \R^C$, forward-mode \texttt{jacfwd} requires only $m$ JVP passes per point (even faster than \texttt{jacrev} when $m \ll D$!), and nesting \path{vmap(jacfwd(...))} batches cleanly across grids and spline nodes. Already used in \path{theory/src/riemannian_manifolds/atlas/autodiff.py}.
+
+    \item \textbf{SciPy (\path{scipy.optimize.minimize}, \path{scipy.integrate.solve_ivp}, \path{solve_bvp})} ---
+    \href{https://docs.scipy.org/doc/scipy/reference/integrate.html}{Documentation} $\mid$ \href{https://github.com/scipy/scipy}{GitHub}.\\
+    Already installed (\texttt{scipy>=1.12})~\cite{virtanen2020scipy}. Provides quasi-Newton \texttt{L-BFGS-B} for fast, superlinearly convergent BVP curve-energy minimization (wrapping \path{torch.func.value_and_grad}), adaptive step-size Dormand--Prince \texttt{RK45}/\texttt{DOP853} for IVP geodesic shooting with error tolerances, and collocation-based \path{solve_bvp} for direct two-point ODE verification.
+
+    \item \textbf{Marimo} ---
+    \href{https://marimo.io}{Website} $\mid$ \href{https://github.com/marimo-team/marimo}{GitHub}.\\
+    Reactive, reproducible Python notebooks stored as pure, Git-friendly \texttt{.py} files (\texttt{marimo>=0.19}). Ideal for linking stage-by-stage UI controls (\path{mo.ui.slider}, \path{mo.ui.dropdown}) to cached PyTorch model computations without hidden mutable notebook state.
+\end{itemize}
+
+\subsection{Tier 2: Riemannian Geometry \& Pullback Manifold Libraries}
+
+When we want pre-built spline manifolds, geodesic statistics (Fr\'echet means, Tangent PCA), or constrained manifold optimizers rather than writing geometric routines from scratch, four mature Python projects stand out (all verified installable in our Python~3.14 \texttt{uv} environment):
+
+\begin{itemize}[leftmargin=*]
+    \item \textbf{StochMan (\emph{Stochastic Manifolds}, Hauberg Lab / DTU \& Univ.\ of Copenhagen)} ---
+    \href{https://github.com/MachineLearningLifeScience/stochman}{GitHub} $\mid$ \href{https://pypi.org/project/stochman/}{PyPI (\texttt{stochman==0.3.0})}.\\
+    \emph{Best lightweight companion library specifically for neural pullback metrics.} Created by S\o{}ren Hauberg's group alongside their foundational papers on deep latent-space curvature~\cite{arvanitidis2018oddity,hauberg2019onlybayes}, \texttt{StochMan} is written natively in PyTorch. It provides \texttt{Manifold} base classes, cubic-spline curve parameterizations (\path{CubicSpline}), discretized geodesic energy minimizers (\path{connecting_geodesic}), $\Exp$/$\Log$ maps, and \texttt{nnj} layers that propagate closed-form Jacobians through neural networks. Even where we keep our own pedagogical 50-line \texttt{torch.func} implementation for clarity, \texttt{StochMan}'s cubic-spline geodesic parametrization is an ideal reference and cross-check.
+
+    \item \textbf{Geomstats} ---
+    \href{https://geomstats.github.io}{Documentation} $\mid$ \href{https://github.com/geomstats/geomstats}{GitHub} $\mid$ \href{https://pypi.org/project/geomstats/}{PyPI (\texttt{geomstats==2.8.0})}.\\
+    The comprehensive geometric statistics and differential geometry library documented in Guigui, Miolane, and Pennec~\cite{guigui2023geomstats,miolane2020geomstats} (included locally in \path{doc/papers/main-now.pdf}). Setting \path{GEOMSTATS_BACKEND=pytorch} unlocks \path{PullbackMetric}, \path{Hypersphere}, \path{SPDMatrices}, \path{InformationManifoldMixin}, \path{FrechetMean}, and \path{TangentPCA}. \emph{When to use it:} \texttt{Geomstats} is slightly heavier than raw \texttt{torch.func} for custom CNN hooks, so we do not need it for Stages~1--3; however, it is the best package to add once we compute \textbf{Fr\'echet means of class activation clusters}, \textbf{Tangent PCA} local charts, or \textbf{norm-preserving spherical steering} on $S^{d-1}$.
+
+    \item \textbf{Geoopt} ---
+    \href{https://geoopt.readthedocs.io}{Documentation} $\mid$ \href{https://github.com/geoopt/geoopt}{GitHub} $\mid$ \href{https://pypi.org/project/geoopt/}{PyPI (\texttt{geoopt==0.5.1})}.\\
+    PyTorch-native Riemannian optimization (\texttt{RiemannianAdam}, \texttt{RiemannianSGD}, and constrained manifold parameters) \cite{kochurov2020geoopt,becigneul2019riemannian} on analytic manifolds (\texttt{Sphere}, \texttt{Stiefel}, \texttt{PoincareBall}, and SPD matrices). Best suited if we learn orthonormal chart frames $E \in \mathrm{St}(m, N)$ on the Stiefel manifold or perform online Riemannian gradient steering (\emph{GeoSteer}-style~\cite{kazama2026geosteer}).
+
+    \item \textbf{Pymanopt} ---
+    \href{https://pymanopt.org}{Website} $\mid$ \href{https://github.com/pymanopt/pymanopt}{GitHub} $\mid$ \href{https://pypi.org/project/pymanopt/}{PyPI (\texttt{pymanopt==2.2.1})}.\\
+    Riemannian trust-region and conjugate-gradient solvers with a PyTorch backend~\cite{townsend2016pymanopt,boumal2023intro}. Valuable for second-order optimization over Grassmannians $\mathrm{Gr}(m, d)$ when fitting optimal low-dimensional steering subspaces.
+
+    \item \textbf{torchdiffeq} ---
+    \href{https://github.com/rtqichen/torchdiffeq}{GitHub} $\mid$ \href{https://pypi.org/project/torchdiffeq/}{PyPI (\texttt{torchdiffeq==0.2.5})}.\\
+    Pure-PyTorch adaptive ODE solvers (\texttt{odeint}, \texttt{dopri5})~\cite{chen2018neuralode} supporting GPU/MPS execution and end-to-end differentiation \emph{through} ODE trajectories (useful if optimizing initial velocity $v_0$ via shooting rather than discrete spline energy).
+\end{itemize}
+
+\subsection{Tier 3: Mechanistic Interpretability Projects (For Subsequent LLM Extension)}
+
+When we extend the MNIST demo to Transformer residual streams on Apple Silicon, three open-source projects represent current best practice:
+
+\begin{itemize}[leftmargin=*]
+    \item \textbf{NNsight (NDIF)} ---
+    \href{https://nnsight.net}{Website} $\mid$ \href{https://github.com/ndif-team/nnsight}{GitHub}.\\
+    Wraps any HuggingFace \texttt{PreTrainedModel} in a clean Python \texttt{with model.trace(prompt):} context, exposing intermediate hidden states and gradients directly as PyTorch tensors without rewriting model internals~\cite{fiotto2024nnsight}. Preserves full autograd compatibility for pullback Fisher Jacobian computation.
+    \item \textbf{pyvene (Stanford NLP)} ---
+    \href{https://stanfordnlp.github.io/pyvene/}{Documentation} $\mid$ \href{https://github.com/stanfordnlp/pyvene}{GitHub}.\\
+    Declarative library for causal abstraction, subspace activation patching, and representation engineering (\texttt{IntervenableModel})~\cite{wu2024pyvene}.
+    \item \textbf{TransformerLens} ---
+    \href{https://transformerlensorg.github.io/TransformerLens/}{Documentation} $\mid$ \href{https://github.com/TransformerLensOrg/TransformerLens}{GitHub}.\\
+    Standardized \texttt{HookedTransformer} architecture exposing named \texttt{HookPoint}s at every attention head, MLP, and residual stream layer---ideal for rapid glass-box experiments on \texttt{GPT-2}, \texttt{Llama-3.2}, and \texttt{Qwen2.5}.
+\end{itemize}
+
+\begin{remark}[Note on the JAX / Diffrax Ecosystem]
+In pure numerical differential geometry, \href{https://github.com/jax-ml/jax}{\textbf{JAX}} combined with \href{https://docs.kidger.site/diffrax/}{\textbf{Diffrax}} (ODE/SDE integration) and \href{https://docs.kidger.site/optimistix/}{\textbf{Optimistix}} (nonlinear least-squares/BVP) offers industry-leading XLA compilation for nested \texttt{jacfwd}/\texttt{jacrev}. However, because both our MNIST codebase (PyTorch Lightning) and the broader mechanistic interpretability ecosystem (\texttt{NNsight}, \texttt{pyvene}, \texttt{TransformerLens}, HuggingFace) are built on \textbf{PyTorch}, staying unified on \textbf{PyTorch \texttt{torch.func} + SciPy} (optionally augmented by \textbf{StochMan} or \textbf{Geomstats}) avoids cross-framework weight conversion while preserving sub-100\,ms interactivity.
+\end{remark}
+
+\subsection{Summary Selection Matrix}
+
+\begin{table}[ht!]
+\centering
+\small
+\renewcommand{\arraystretch}{1.35}
+\begin{tabularx}{\textwidth}{@{} >{\raggedright\arraybackslash}p{0.25\textwidth} >{\raggedright\arraybackslash}p{0.24\textwidth} >{\raggedright\arraybackslash}p{0.20\textwidth} Y @{}}
+\toprule
+\textbf{Subsystem / Task} & \textbf{Primary Choice} & \textbf{Optional Companion} & \textbf{Rationale} \\
+\midrule
+Pullback Metrics $g_{ij}(u)$ \& Christoffels $\Gamma^k_{ij}(u)$ & \texttt{torch.func} (\texttt{jacfwd}, \texttt{jacrev}, \texttt{vmap}) & \texttt{Geomstats} (\texttt{PullbackMetric}) & Zero new deps; $m$-pass forward-mode AD (\texttt{jacfwd}) for $m=2$ is exact and $<2\,\mathrm{ms}$ per point. \\
+\addlinespace
+BVP Geodesic Solver ($x_A \to x_B$) & \texttt{scipy.optimize} (\texttt{L-BFGS-B}) + PyTorch grad & \texttt{StochMan} (\texttt{CubicSpline}) & Minimizes discrete energy $E_{\mathrm{disc}}$ using only 1st-order Jacobians; fast and unconditionally stable. \\
+\addlinespace
+IVP Geodesic Shooting ($\Exp_{u_A}(t v_0)$) & \texttt{scipy.integrate} (\texttt{solve\_ivp}, \texttt{RK45}) & \texttt{torchdiffeq} (\texttt{dopri5}) & Adaptive step-size error control; upgrade to \texttt{torchdiffeq} only if backpropagating through IVP. \\
+\addlinespace
+Manifold PCA, Fr\'echet Means, \& $S^{d-1}$ Steering & \texttt{Geomstats} (\texttt{pytorch} backend) & \texttt{Geoopt} (\texttt{Stiefel}, \texttt{Sphere}) & Ready-made \texttt{TangentPCA}, \texttt{FrechetMean}, and Stiefel/Sphere retractions verified on Python~3.14. \\
+\addlinespace
+Interactive UI \& Visualization & \texttt{Marimo} + \texttt{Matplotlib} & --- & Matches existing \path{mnist_demo.py} and \path{manifold_atlas.py}. \\
+\addlinespace
+Phase 2 LLM Residual Steering & \texttt{NNsight} or \texttt{TransformerLens} & \texttt{pyvene} & Clean PyTorch hook/trace access with autograd preserved for top-$K$ Fisher pullbacks. \\
+\bottomrule
+\end{tabularx}
+\caption{Recommended package selection across the manifold steering stack.}
+\label{tab:package-matrix}
+\end{table}
+
+% =============================================================================
+\begin{thebibliography}{99}
+
+\bibitem{amari2016infogeom}
+S.-i. Amari,
+\emph{Information Geometry and Its Applications},
+Applied Mathematical Sciences, vol.~194, Springer, 2016.
+DOI: \href{https://doi.org/10.1007/978-4-431-55978-8}{10.1007/978-4-431-55978-8}.
+
+\bibitem{arvanitidis2018oddity}
+G.~Arvanitidis, L.~K.~Hansen, and S.~Hauberg,
+``Latent Space Oddity: on the Curvature of Deep Generative Models,''
+in \emph{International Conference on Learning Representations (ICLR)}, 2018.
+arXiv: \href{https://arxiv.org/abs/1710.11379}{1710.11379}.
+
+\bibitem{becigneul2019riemannian}
+G.~B\'ecigneul and O.-E.~Ganea,
+``Riemannian Adaptive Optimization Methods,''
+in \emph{International Conference on Learning Representations (ICLR)}, 2019.
+arXiv: \href{https://arxiv.org/abs/1810.00760}{1810.00760}.
+
+\bibitem{biswas2022smu}
+K.~Biswas, S.~Kumar, S.~Banerjee, and A.~K.~Pandey,
+``SMU: Smooth Activation Function for Deep Networks Using Smoothing Maximum Technique,''
+in \emph{CVPR}, 2022.
+arXiv: \href{https://arxiv.org/abs/2111.04682}{2111.04682}.
+
+\bibitem{boumal2023intro}
+N.~Boumal,
+\emph{An Introduction to Optimization on Smooth Manifolds},
+Cambridge University Press, 2023.
+URL: \href{https://www.nicolasboumal.net/book/}{nicolasboumal.net/book}.
+
+\bibitem{chen2018neuralode}
+R.~T.~Q.~Chen, Y.~Rubanova, J.~Bettencourt, and D.~K.~Duvenaud,
+``Neural Ordinary Differential Equations,''
+in \emph{Advances in Neural Information Processing Systems (NeurIPS)}, 2018.
+arXiv: \href{https://arxiv.org/abs/1806.07366}{1806.07366} $\mid$
+Code: \href{https://github.com/rtqichen/torchdiffeq}{github.com/rtqichen/torchdiffeq}.
+
+\bibitem{engels2024nonlinear}
+J.~Engels, E.~J.~Michaud, I.~Liao, W.~Gurnee, and M.~Tegmark,
+``Not All Language Model Features Are One-Dimensionally Linear,''
+in \emph{ICLR}, 2025.
+arXiv: \href{https://arxiv.org/abs/2405.14860}{2405.14860}.
+
+\bibitem{fiotto2024nnsight}
+J.~Fiotto-Kaufman, A.~R.~Loftus, E.~Todd, J.~Brinkmann, C.~Juang, K.~Pal, C.~Rager, A.~Mueller, S.~Marks, A.~S.~Sharma, F.~Lucchetti, M.~Ripa, A.~Belfki, N.~Prakash, S.~Multani, C.~Brodley, A.~Guha, J.~Bell, B.~Wallace, and D.~Bau,
+``NNsight and NDIF: Democratizing Access to Foundation Model Internals,''
+in \emph{ICLR}, 2025.
+arXiv: \href{https://arxiv.org/abs/2407.14561}{2407.14561} $\mid$
+Project: \href{https://nnsight.net}{nnsight.net}.
+
+\bibitem{guigui2023geomstats}
+N.~Guigui, N.~Miolane, and X.~Pennec,
+``Introduction to Riemannian Geometry and Geometric Statistics: From Basic Theory to Implementation with Geomstats,''
+\emph{Foundations and Trends in Machine Learning}, vol.~16, no.~3, pp.~329--493, 2023.
+DOI: \href{https://doi.org/10.1561/2200000098}{10.1561/2200000098} $\mid$
+HAL: \href{https://inria.hal.science/hal-03766900v2}{hal-03766900v2}.
+
+\bibitem{hauberg2019onlybayes}
+S.~Hauberg, N.~S.~Detlefsen, M.~J\o{}rgensen, et al.,
+``Only Bayes Should Learn a Manifold (on the Estimation of Differential Geometric Structure from Data)'' and the \emph{StochMan} Library, 2019--2025.
+arXiv: \href{https://arxiv.org/abs/1806.04994}{1806.04994} $\mid$
+Code: \href{https://github.com/MachineLearningLifeScience/stochman}{github.com/MachineLearningLifeScience/stochman}.
+
+\bibitem{kazama2026geosteer}
+K.~Kazama et al.,
+``GeoSteer: Faithful Chain-of-Thought Steering via Latent Manifold Gradients'' and related geodesic activation optimization frameworks, 2026.
+arXiv: \href{https://arxiv.org/abs/2601.10229}{2601.10229}; see also \href{https://arxiv.org/abs/2609.10658}{2609.10658}.
+
+\bibitem{kochurov2020geoopt}
+M.~Kochurov, R.~Karimov, and S.~Kozlukov,
+``Geoopt: Riemannian Optimization in PyTorch,'' 2020.
+arXiv: \href{https://arxiv.org/abs/2005.02819}{2005.02819} $\mid$
+Code: \href{https://github.com/geoopt/geoopt}{github.com/geoopt/geoopt}.
+
+\bibitem{miolane2020geomstats}
+N.~Miolane, N.~Guigui, A.~Le~Brigant, J.~Mathe, B.~Hou, Y.~Thanwerdas, S.~Heyder, O.~Peltre, N.~Koep, H.~Zaatiti, H.~Hajri, Y.~Cabanes, T.~Gerald, P.~Chauchat, C.~Shewmake, D.~Brooks, B.~Kainz, C.~Donnat, S.~Holmes, and X.~Pennec,
+``Geomstats: A Python Package for Riemannian Geometry in Machine Learning,''
+\emph{Journal of Machine Learning Research}, vol.~21, no.~223, pp.~1--9, 2020.
+URL: \href{https://jmlr.org/papers/v21/19-027.html}{jmlr.org/papers/v21/19-027} $\mid$
+Code: \href{https://github.com/geomstats/geomstats}{github.com/geomstats/geomstats}.
+
+\bibitem{morgan2016riemannian}
+F.~Morgan,
+\emph{Riemannian Geometry: A Beginner's Guide}, 2nd~ed.,
+CRC Press / A~K~Peters, 1998 (reprinted 2016).
+DOI: \href{https://doi.org/10.1201/9781439863992}{10.1201/9781439863992}.
+
+\bibitem{oozeer2026riemannian}
+N.~Oozeer, S.~Raval, P.~Quirke, M.~Ravikiran, J.~Phillips, S.~Upadhyay, and A.~Abdullah,
+``Riemannian-Manifold Steering: Geometry-Aware Generative Autoencoders for Label-Free Steering,'' 2026.
+arXiv: \href{https://arxiv.org/abs/2605.24942}{2605.24942}.
+
+\bibitem{park2024linear}
+K.~Park, Y.~J.~Choe, and V.~Veitch,
+``The Linear Representation Hypothesis and the Geometry of Large Language Models,''
+in \emph{International Conference on Machine Learning (ICML)}, 2024.
+arXiv: \href{https://arxiv.org/abs/2311.03658}{2311.03658}.
+
+\bibitem{paszke2019pytorch}
+A.~Paszke et al.,
+``PyTorch: An Imperative Style, High-Performance Deep Learning Library'' (with \texttt{torch.func} composable function transforms),
+in \emph{NeurIPS}, 2019.
+arXiv: \href{https://arxiv.org/abs/1912.01703}{1912.01703} $\mid$
+Docs: \href{https://pytorch.org/docs/stable/func.html}{pytorch.org/docs/stable/func.html}.
+
+\bibitem{rimsky2024caa}
+N.~Rimsky, N.~Gabrieli, J.~Schulz, M.~Tong, E.~Hubinger, and A.~M.~Turner,
+``Steering Llama~2 via Contrastive Activation Addition,''
+in \emph{Proceedings of the 62nd Annual Meeting of the Association for Computational Linguistics (ACL)}, 2024.
+arXiv: \href{https://arxiv.org/abs/2312.06681}{2312.06681}.
+
+\bibitem{townsend2016pymanopt}
+J.~Townsend, N.~Koep, and S.~Weichwald,
+``Pymanopt: A Python Toolbox for Optimization on Manifolds Using Automatic Differentiation,''
+\emph{Journal of Machine Learning Research}, vol.~17, no.~137, pp.~1--5, 2016.
+URL: \href{https://pymanopt.org}{pymanopt.org} $\mid$
+Code: \href{https://github.com/pymanopt/pymanopt}{github.com/pymanopt/pymanopt}.
+
+\bibitem{turner2023actadd}
+A.~M.~Turner, L.~Thiergart, G.~Leech, D.~Udell, J.~J.~Vazquez, U.~Mini, and M.~MacDiarmid,
+``Activation Addition: Steering Language Models Without Optimization,'' 2023.
+arXiv: \href{https://arxiv.org/abs/2308.10248}{2308.10248}.
+
+\bibitem{virtanen2020scipy}
+P.~Virtanen et al.,
+``SciPy 1.0: Fundamental Algorithms for Scientific Computing in Python,''
+\emph{Nature Methods}, vol.~17, pp.~261--272, 2020.
+DOI: \href{https://doi.org/10.1038/s41592-019-0686-2}{10.1038/s41592-019-0686-2} $\mid$
+Docs: \href{https://docs.scipy.org/doc/scipy/}{docs.scipy.org}.
+
+\bibitem{wu2024pyvene}
+Z.~Wu, A.~Geiger, A.~Arora, J.~Huang, Z.~Wang, N.~D.~Goodman, C.~D.~Manning, and C.~Potts,
+``pyvene: A Library for Understanding and Improving PyTorch Models via Interventions,''
+in \emph{NAACL System Demonstrations}, 2024.
+arXiv: \href{https://arxiv.org/abs/2403.07809}{2403.07809} $\mid$
+Code: \href{https://github.com/stanfordnlp/pyvene}{github.com/stanfordnlp/pyvene}.
+
+\bibitem{wurgaft2026manifold}
+D.~Wurgaft, C.~Rager, M.~Kowal, V.~Shyam, S.~Feucht, U.~Bhalla, T.~Haklay, E.~Bigelow, R.~Sarfati, T.~McGrath, O.~Lewis, J.~Merullo, N.~D.~Goodman, T.~Fel, A.~Geiger, and E.~S.~Lubana,
+``Manifold Steering Reveals the Shared Geometry of Neural Network Representation and Behavior,'' 2026.
+arXiv: \href{https://arxiv.org/abs/2605.05115}{2605.05115}.
+
+\bibitem{zou2023repe}
+A.~Zou, L.~Phan, S.~Chen, J.~Campbell, P.~Guo, R.~Ren, A.~Pan, X.~Yin, M.~Mazeika, A.-K.~Dombrowski, S.~Goel, N.~Li, M.~J.~Byun, Z.~Wang, A.~Mallen, S.~Basart, S.~Koyejo, D.~Song, M.~Fredrikson, J.~Z.~Kolter, and D.~Hendrycks,
+``Representation Engineering: A Top-Down Approach to AI Transparency,'' 2023.
+arXiv: \href{https://arxiv.org/abs/2310.01405}{2310.01405}.
+
+\end{thebibliography}
+
+\end{document}

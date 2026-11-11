@@ -24,6 +24,8 @@ dependencies = [
     "python-dotenv>=1.0.1",
     "tqdm>=4.66.2",
     "kubernetes>=36.0.3",
+    "stochman>=0.3.0",
+    "geomstats>=2.8.0",
 ]
 
 [project.optional-dependencies]

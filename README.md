@@ -73,3 +73,20 @@ All container orchestration files and generated experiment configs are derived f
 * **MNIST CNN Specification & Walkthroughs**: [`doc/md/models/MNIST/README.md`](doc/md/models/MNIST/README.md)
 * **Manifold Steering Primer & Architecture**: [`theory/manifold_steering_primer.pdf`](theory/manifold_steering_primer.pdf) ([Markdown](doc/md/models/MNIST/manifold_steering_primer.md)) and [`theory/manifold_steering_design.pdf`](theory/manifold_steering_design.pdf)
 * **Riemannian Manifolds & Geometry Theory**: [`theory/README.md`](theory/README.md)
+
+## Language-model research overview
+
+The early research website is in [`sites/language-model-interpretability/`](sites/language-model-interpretability/README.md).
+It introduces the objectives, causal research approach, first GPT-2 experiment,
+observations, limitations, and possible extensions. The experiment itself is in
+[`experiments/interpretability/`](experiments/interpretability/README.md).
+
+To present the website locally:
+
+```sh
+cd /Users/frankelliott/Documents/Projects/Python/interpetability
+python3 -m http.server 8767 --bind 127.0.0.1 --directory sites/language-model-interpretability/dist
+```
+
+Open http://127.0.0.1:8767 and share that browser window in Zoom.
+Leave Terminal running during the presentation; press Control-C afterward.

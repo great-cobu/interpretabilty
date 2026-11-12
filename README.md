@@ -71,5 +71,5 @@ All container orchestration files and generated experiment configs are derived f
 
 * **Container & MLOps Stack**: [`DOCKER_SETUP.md`](DOCKER_SETUP.md) and [`prolog/README.md`](prolog/README.md)
 * **MNIST CNN Specification & Walkthroughs**: [`doc/md/models/MNIST/README.md`](doc/md/models/MNIST/README.md)
-* **Manifold Steering Primer & Architecture**: [`doc/md/models/MNIST/manifold_steering_primer.md`](doc/md/models/MNIST/manifold_steering_primer.md) and [`theory/manifold_steering_design.pdf`](theory/manifold_steering_design.pdf)
+* **Manifold Steering Primer & Architecture**: [`theory/manifold_steering_primer.pdf`](theory/manifold_steering_primer.pdf) ([Markdown](doc/md/models/MNIST/manifold_steering_primer.md)) and [`theory/manifold_steering_design.pdf`](theory/manifold_steering_design.pdf)
 * **Riemannian Manifolds & Geometry Theory**: [`theory/README.md`](theory/README.md)

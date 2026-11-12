@@ -1,6 +1,6 @@
 # `riemannian-manifolds`: Differential Geometry of Activation Manifolds
 
-Executable differential geometry and automatic differentiation library accompanying the paper [*Mechanistic Interpretability via Riemannian Information Geometry on Activation Space*](mechanistic_interpretability_geometry.tex).
+Executable differential geometry and automatic differentiation library accompanying the papers [*Mechanistic Interpretability via Riemannian Information Geometry on Activation Space*](mechanistic_interpretability_geometry.pdf) ([TeX](mechanistic_interpretability_geometry.tex)), [*Riemannian Manifold Steering in Neural Networks*](manifold_steering_design.pdf) ([TeX](manifold_steering_design.tex)), and [*A Calculus-Based Primer on Riemannian Manifold Steering*](manifold_steering_primer.pdf) ([TeX](manifold_steering_primer.tex)).
 
 ---
 

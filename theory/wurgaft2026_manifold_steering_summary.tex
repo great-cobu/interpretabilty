@@ -1,0 +1,148 @@
+\documentclass[10pt,a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage[margin=0.85in]{geometry}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{mathtools}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{array}
+\usepackage{xcolor}
+\usepackage{enumitem}
+\usepackage{parskip}
+\usepackage{microtype}
+\usepackage[most]{tcolorbox}
+\usepackage{hyperref}
+
+\setlength{\emergencystretch}{1.5em}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue!60!black,
+    urlcolor=blue!60!black,
+    citecolor=blue!60!black,
+    pdftitle={Paper Summary: Manifold Steering Reveals the Shared Geometry of Neural Network Representation and Behavior},
+    pdfauthor={Frank W. Elliott Jr.}
+}
+
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\Mh}{\mathcal{M}_h}
+\newcommand{\My}{\mathcal{M}_y}
+
+\newtcolorbox{metaheader}{
+    enhanced,
+    colback=blue!3!white,
+    colframe=blue!55!black,
+    boxrule=0.6pt,
+    arc=2pt,
+    left=8pt,
+    right=8pt,
+    top=6pt,
+    bottom=6pt
+}
+
+\begin{document}
+
+\begin{center}
+    {\LARGE \textbf{Paper Summary: Manifold Steering Reveals the Shared Geometry of Neural Network Representation and Behavior}}\\[0.4em]
+    {\normalsize Concise Technical Synopsis of Wurgaft, Rager, Kowal et al.\ (2026)}
+\end{center}
+
+\begin{metaheader}
+\small\raggedright
+\textbf{Paper:} Daniel Wurgaft$^\star$, Can Rager$^\star$, Matthew Kowal$^\star$, Vasudev Shyam, Sheridan Feucht, Usha Bhalla, Tal Haklay, Eric Bigelow, Raphael Sarfati, Thomas McGrath, Owen Lewis, Jack Merullo, Noah D.\ Goodman$^\dagger$, Thomas Fel$^\dagger$, Atticus Geiger$^\dagger$, and Ekdeep Singh Lubana$^\dagger$. \emph{``Manifold Steering Reveals the Shared Geometry of Neural Network Representation and Behavior,''} May 6, 2026.\\[0.25em]
+\textbf{Links:} \href{https://arxiv.org/abs/2605.05115}{arXiv:2605.05115v1 [cs.LG]} $\;\mid\;$ \href{run:assets/2605.05115v1.pdf}{Local PDF (\texttt{assets/2605.05115v1.pdf})} $\;\mid\;$ \href{https://github.com/goodfire-ai/causalab/tree/manifold_steering}{GitHub (\texttt{goodfire-ai/causalab})}
+\end{metaheader}
+
+% =============================================================================
+\section{Central Question and Thesis}
+% =============================================================================
+
+Neural network activations exhibit rich nonlinear geometric structures---such as circles for weekdays and months, helices for numbers, and curved sheets for graph states---yet standard activation-steering methods (Activation Addition, Contrastive Activation Addition) treat activation space $\mathcal{A} = \R^n$ as flat Euclidean space. Motivated by the \textbf{Linear Representation Hypothesis (LRH)}, linear steering translates activations along straight chords, $\pi_{\mathrm{lin}}(t) = (1-t)h_0^\star + t h_1^\star$, which the authors motivate through reports of degraded fluency, off-target drift, and abrupt output transitions in prior steering work.
+
+Wurgaft et al.\ ask whether representation geometry plays a \emph{direct causal role} in shaping model behavior. By fitting an \textbf{activation manifold} $\Mh \subseteq \mathcal{A}$ to unintervened hidden states and a \textbf{behavior manifold} $\My \subseteq \mathcal{Y}$ to unintervened output probability distributions over task concepts $Z$, they report evidence for the following claims on structured tasks:
+\begin{enumerate}[leftmargin=*,nosep]
+    \item \textbf{Geometric Correspondence ($\Mh \leftrightarrow \My$):} Distances along fitted activation and behavior manifolds are highly correlated, more strongly than activation-space chords are with behavior-manifold distances. These correlations support geometric correspondence; alone, they do not establish a Riemannian isometry or uniformly small metric distortion.
+    \item \textbf{Intervention and Optimization Evidence:} Intervening along $\Mh$ (\emph{manifold steering}, $\Mh \to \My$) induces smooth, natural behavioral trajectories along $\My$. Conversely, optimizing activation paths to track $\My$ (\emph{pullback steering}, $\My \to \Mh$) produces paths closer to the fitted activation manifold $\Mh$ than linear chords, under the reported recovery measure.
+    \item \textbf{Reframing Steering:} The authors propose the geometry of a concept as the organizing object for activation-based control, extending approaches based on a fixed steering direction.
+\end{enumerate}
+
+% =============================================================================
+\section{Mathematical Framework and Manifold Construction}
+% =============================================================================
+
+\paragraph{Spaces and Spline Parameterizations.}
+For a task over discrete concepts $Z$, activation space is $\mathcal{A} = \R^n$ and behavior space $\mathcal{Y} = \Delta^{|Z|}$ is the open probability simplex over $|Z|$ concept tokens plus a catch-all \texttt{`other'} class for off-concept mass.
+\begin{itemize}[leftmargin=*,nosep]
+    \item \textbf{Activation Manifold $\Mh$:} Unintervened activations $h(x)$ (Llama~3.1~8B residual stream at layer~28, last token) are projected to a 64-D PCA subspace and averaged by ground-truth answer into concept centroids $c_i$. Smooth parameterizations $s : \R^k \to \R^{64}$ are fit exactly through $\{c_i\}$: periodic 1D cubic splines (using unsupervised $\theta = \operatorname{atan2}(\mathrm{PC}_2, \mathrm{PC}_1)$) for cyclic tasks, natural 1D cubic splines for sequential tasks, and 2D thin-plate splines ($r^2 \log r$) for graph tasks. During manifold steering, only the 64-D PCA subspace is replaced while the orthogonal residual complement is preserved.
+    \item \textbf{Behavior Manifold $\My$ (Hellinger Sphere Geometry):} Output probability centroids $b_i \in \Delta^{|Z|}$ are mapped via $b_i \mapsto \sqrt{b_i}$ onto the positive orthant of the unit sphere $S^{|Z|} \subset \R^{|Z|+1}$, where Euclidean chord distance equals scaled Hellinger distance, $d_H(p,q) = \frac{1}{\sqrt{2}}\|\sqrt{p} - \sqrt{q}\|_2$. To obtain normalized, nonnegative probability vectors, centroids are projected into the tangent plane at the normalized mean $b^*$ via the spherical logarithm $t_i = \log_{b^*}(\sqrt{b_i})$, interpolated by splines, and mapped back via $\exp_{b^*}(t)$ before squaring entries. The exponential map preserves unit norm, but does not itself guarantee that the square-root coordinates stay in the positive orthant or that all decoded probabilities are strictly positive.
+\end{itemize}
+
+\paragraph{Unifying Three Geometries of Steering (Definition 1).}
+Equipping $\mathcal{A}$ with a position-dependent Riemannian metric $G(h)$ defines curve length $L_G(\pi) = \int_0^1 \sqrt{\dot{\pi}(t)^\top G(\pi(t))\,\dot{\pi}(t)}\,dt$. The paper proposes three metrics as a unifying interpretation of steering strategies:
+\begin{align}
+    G_I &= I_n && \text{\small(Flat / Linear Steering: $\pi_{\mathrm{lin}}(t) = (1-t)h_0^\star + t h_1^\star$)} \label{eq:flat}\\
+    G_E(h) &= \bigl(\alpha e^{-E(h)} + \beta\bigr)^{-1} I_n && \text{\small(Density-based geometry)} \label{eq:density}\\
+    G_F(h) &= J_F(h)^\top g_y\bigl(F(h)\bigr) J_F(h) + \epsilon I_n && \text{\small(Pullback Steering via $F : \mathcal{A} \to \mathcal{Y}$, $\epsilon > 0$)} \label{eq:pullback}
+\end{align}
+In Eq.~\eqref{eq:density}, $E(h) \propto -\log p(h)$ is an energy function on natural activations ($\alpha,\beta > 0$). The metric makes low-density regions more expensive, but finite $\beta$ does not constrain shortest paths to remain exactly on $\Mh$. The implemented manifold path is spline-coordinate interpolation, $\pi_m(t)=s((1-t)u_0+t u_1)$; straight coordinate segments need not be geodesics under the induced metric, especially for 2D surfaces.
+
+In Eq.~\eqref{eq:pullback}, $g_y$ denotes the behavior-space metric, evaluated where it is defined, and $J_F$ is the Jacobian of the activation-to-behavior map. With $|Z|+1$ output classes, $\dim\mathcal{Y}=|Z|$, so $\operatorname{rank}(J_F)\leq\min(n,|Z|)$; the paper's $|Z|-1$ bound omits the additional class. For $v\in\ker(J_F)$, $v^\top G_Fv=\epsilon\|v\|^2$: positive $\epsilon$ regularizes null directions, but these directions become degenerate as $\epsilon\to0$. A metric defined only on $\My$ requires an extension or a restriction of $F$ before it can be pulled back away from $\My$. The empirical target-matching optimization is not, in general, equivalent to solving the regularized geodesic problem. Similar recovered paths support an approximate relationship between the geometries, rather than proving that $G_E$ and $G_F$ have coincident geodesics.
+
+% =============================================================================
+\section{Empirical and Causal Results Across Domains}
+% =============================================================================
+
+\paragraph{1. Smooth Concept Transitions vs.\ Linear ``Teleportation'' (\S2--\S3).}
+Across four Llama~3.1~8B arithmetic/ordering tasks, manifold steering shifts output probability mass smoothly through ordered intermediates (e.g., \texttt{Mon $\to$ Tue $\to$ Wed $\to$ Thu} or \texttt{Jan $\to$ Feb $\to \dots \to$ Jul}). Linear steering cuts across the interior of the loop or curve, causing \textbf{probability teleportation}: mass jumps directly between non-adjacent endpoints while off-concept (\texttt{`other'}) probability spikes near $t \approx 0.5$. Naturalness is quantified by cumulative Bhattacharyya off-manifold energy along induced trajectory $\gamma(t) = p_{h \leftarrow \pi(t)}(x)$,
+\begin{equation}
+    E_{\mathrm{BC}}(\gamma) = \int_0^1 \inf_{q \in \My} \Bigl(-\log \sum_i \sqrt{\gamma_i(t)\, q_i}\Bigr)\,dt,
+\end{equation}
+Appendix A.7 implements this as an unnormalized sum over 50 waypoints; the table reproduces those cumulative sums, rather than a normalized integral. The authors report that manifold steering reduces $E_{\mathrm{BC}}$ by an average factor of \textbf{$2.8\times$} ($p < 0.001$ on all tasks; Table~\ref{tab:results}).
+
+\paragraph{2. Behavioral Target Matching Approaches $\Mh$ (\S3.3).}
+Starting from target distributions $\hat{p}_t \in \My$ and initializing at the straight chord in 32-D PCA space, optimizing a 10-control-point cubic spline via L-BFGS to minimize $\sum_t d_H^2(p_{h \leftarrow \pi(t)}, \hat{p}_t)$ produces activation paths closer to $\Mh$ ($R^2 = 0.47\text{--}0.78$ vs.\ $0.23\text{--}0.42$ for linear chords, $p < 0.001$). Appendix A.9 computes this recovery score after projection into a basis capturing 99\% of the reference path variance, using closest-point distances; it does not establish recovery in the full activation space or uniqueness of the solution.
+
+\paragraph{3. Multi-Dimensional Factored Control and Uncertainty (\S4, App.\ C).}
+When Llama~3.1~8B learns $5 \times 5$ grids or $9 \times 9$ cylinders purely \emph{in-context} from 2048-token random walks over arbitrary nouns, 2D thin-plate spline charts achieve \textbf{factored control}: steering along one intrinsic coordinate shifts row predictions smoothly while holding column position fixed (and vice versa), whereas linear chords warp MDS geometry and teleport. In Llama~3.1~70B (layer~70), grouping weekday addition by increment size ($k \in [1..5]$ through $[16..20]$) reveals concentric circles forming a \textbf{2D cylinder} whose circular paths yield ordered weekday transitions at different entropy levels across increment groups. This suggests a possible handle on uncertainty; it does not establish calibrated confidence or independent axial control.
+
+\paragraph{4. Visual World Model: Mountain Car (\S5, App.\ B \& C.3).}
+In a CNN + GRU world model predicting next frames $\hat{x}_{t+1} = x_t + f_{\mathrm{dec}}(h_t)$ in \texttt{MountainCar-v0}, the 64-D encoder's 1D position manifold folds back on itself so distant track positions sit close in Euclidean space (chord-to-behavior correlation $r = 0.06$, vs.\ $r = 0.996$ for manifold arc lengths). Linear steering decodes incoherent, ghosted car superpositions before teleporting to the goal; manifold paths yield coherent decoded position transitions. Pullback achieves $95.4\%$ chord-to-geometric recovery and improves over the chord on $30/30$ pairs. Crucially, the quantitative behavior map is $F(z)=\operatorname{softmax}(-\|z-\mu_b\|^2/\tau)$ over anchors $\mu_b$ sampled from the activation manifold (App. B), rather than the decoder's predicted images. Thus the geometric correspondence is partly built into the measurement; decoded frames provide separate qualitative evidence, rather than demonstrating closed-loop control.
+
+\begin{table}[ht!]
+\centering
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{1.15}
+\begin{tabularx}{\textwidth}{@{}l l c c Y Y@{}}
+\toprule
+\textbf{Domain / Modality} & \textbf{Topology} & \textbf{Dist.\ $r$ ($\Mh$)} & \textbf{Dist.\ $r$ (Lin.)} & \textbf{Energy $E_{\mathrm{BC}}$ ($\Mh$ vs.\ Lin.)} & \textbf{Pullback Recovery} \\
+\midrule
+Weekdays (Llama 8B) & 1D Circle ($S^1$) & \textbf{0.990} & 0.887 & \textbf{0.34} vs.\ 0.93 & $R^2 = \mathbf{0.77}$ (vs.\ 0.42) \\
+Months (Llama 8B) & 1D Circle ($S^1$) & \textbf{0.888} & 0.529 & \textbf{0.36} vs.\ 1.09 & $R^2 = \mathbf{0.75}$ (vs.\ 0.32) \\
+Letters (Llama 8B) & 1D Interval & \textbf{0.999} & 0.710 & \textbf{2.42} vs.\ 6.95 & $R^2 = \mathbf{0.78}$ (vs.\ 0.23) \\
+Ages (Llama 8B) & 1D Interval & \textbf{0.999} & 0.358 & \textbf{5.21} vs.\ 13.49 & $R^2 = \mathbf{0.47}$ (vs.\ 0.24) \\
+ICL $5\times 5$ Grid (Llama 8B) & 2D Sheet & \textbf{0.99} & 0.90 & Factored row/col control & --- \\
+ICL $9\times 9$ Cyl.\ (Llama 8B) & $S^1 \times [0,1]$ & \textbf{0.99} & 0.81 & Factored periodic/axial coordinates & --- \\
+Mountain Car (CNN+GRU) & 1D Folded Loop & \textbf{0.996} & 0.06 & Coherent frames (no ghosting) & \textbf{95.4\%} (dist.\ 0.29 vs.\ 2.22) \\
+\bottomrule
+\end{tabularx}
+\caption{Summary of geometric correspondence, behavioral naturalness, and pullback recovery reported across all tasks in Wurgaft et al.\ (2026). Reported comparisons on the four natural-domain language tasks satisfy $p < 0.001$.}
+\label{tab:results}
+\end{table}
+
+% =============================================================================
+\section{Conceptual Implications and Limitations}
+% =============================================================================
+
+\begin{itemize}[leftmargin=*,nosep]
+    \item \textbf{Intrinsic Manifold Coordinates as Causal Primitives (\S7):} Non-linear causal abstraction faces an identifiability dilemma because unconstrained non-linear maps admit degenerate solutions. Fitting $\Mh$ to the empirical support of natural activations constrains causal variables to \textbf{intrinsic manifold coordinates}, excluding arbitrary off-manifold interventions from that fitted parameterization, without resolving causal identifiability in general. Moreover, the ICL random-walk results suggest that even when geometry is formed dynamically in-context rather than inherited from pretraining token frequencies, activation geometry is relevant to the measured output transitions.
+    \item \textbf{Baseline Confound (App. A.6):} Manifold steering preserves the prompt's residual outside the 64-D PCA subspace, whereas linear steering replaces the entire residual stream with interpolated raw centroids. The comparison therefore changes both path geometry and retained prompt information. A linear baseline operating in the same PCA subspace with the same preserved residual is needed to isolate the effect of geometry.
+    \item \textbf{Interpretation of Evidence:} High distance correlations are not a proof of isometry. Pullback recovery depends on a restricted search space, initialization, regularization, and a projected recovery measure. In Mountain Car, the behavior map is constructed from activation-manifold anchors, limiting its independence as a validation of shared geometry. Appendix B also asserts full Jacobian rank from the number of bins; bin count alone does not guarantee rank, which depends on the anchor configuration.
+    \item \textbf{Scope and Open Limitations (\S8):} (1)~\emph{Known vs.\ latent concept topologies:} All tested tasks have clean, low-dimensional ground-truth coordinates for spline fitting; extending manifold steering to abstract alignment traits (refusal, sycophancy, persuasion) requires unsupervised manifold discovery from in-the-wild activations and operators to navigate unknown topologies. (2)~\emph{Single-token vs.\ sequence generation:} Experiments intervene and measure single-token distributions rather than multi-token posterior belief trajectories. (3)~\emph{Output-adjacent layers:} Interventions target late residual layers or encoder outputs directly mediating predictions rather than intermediate algorithmic circuits.
+\end{itemize}
+
+\end{document}
